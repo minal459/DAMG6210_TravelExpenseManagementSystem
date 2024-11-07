@@ -155,3 +155,163 @@ CREATE TABLE Payment (
     CONSTRAINT fk_payment_reimbursement FOREIGN KEY (ReimbursementID) REFERENCES Reimbursement(ReimbursementID)
         ON DELETE CASCADE
 );
+
+-----------------------------------------Views---------------------------------------------------------------------------------------
+
+
+DROP VIEW HighValueExpenses;
+DROP VIEW ExpenseSummaryByEmployee;
+DROP VIEW PendingApprovals;
+DROP VIEW ExpensesByStatus;
+DROP VIEW TotalExpensesByType;
+DROP VIEW ApprovedExpensesOverTime;
+DROP VIEW AdministratorActivityLog;
+DROP VIEW ReimbursementDetails;
+
+-- 1. View: High-Value Expenses
+CREATE OR REPLACE VIEW HighValueExpenses AS
+SELECT 
+    e.ExpenseID,
+    e.EmployeeID,
+    emp.FirstName,
+    emp.LastName,
+    e.Amount,
+    e.Description,
+    e.ExpenseDate
+FROM 
+    Expense e
+JOIN 
+    Employee emp ON e.EmployeeID = emp.EmployeeID
+WHERE 
+    e.Amount > 1000;
+
+SELECT * FROM HighValueExpenses;
+
+-- 2. View: Expense Summary by Employee
+CREATE OR REPLACE VIEW ExpenseSummaryByEmployee AS
+SELECT 
+    emp.EmployeeID,
+    emp.FirstName,
+    emp.LastName,
+    et.TypeName AS ExpenseType,
+    SUM(e.Amount) AS TotalAmount
+FROM 
+    Expense e
+JOIN 
+    Employee emp ON e.EmployeeID = emp.EmployeeID
+JOIN 
+    ExpenseType et ON e.ExpenseTypeID = et.ExpenseTypeID
+GROUP BY 
+    emp.EmployeeID, emp.FirstName, emp.LastName, et.TypeName;
+
+SELECT * FROM ExpenseSummaryByEmployee;
+
+-- 3. View: Pending Approvals
+CREATE OR REPLACE VIEW PendingApprovals AS
+SELECT 
+    a.ApprovalID,
+    e.ExpenseID,
+    emp.EmployeeID,
+    emp.FirstName,
+    emp.LastName,
+    fa.FirstName AS AuditorFirstName,
+    fa.LastName AS AuditorLastName,
+    a.ApprovalDate,
+    a.Comments
+FROM 
+    Approval a
+JOIN 
+    Expense e ON a.ExpenseID = e.ExpenseID
+JOIN 
+    Employee emp ON e.EmployeeID = emp.EmployeeID
+JOIN 
+    FinancialAuditor fa ON a.AuditorID = fa.AuditorID
+WHERE 
+    a.StatusID = (SELECT StatusID FROM ExpenseStatus WHERE StatusName = 'Pending');
+
+SELECT * FROM PendingApprovals;
+-- 4. View: Expenses by Status
+CREATE OR REPLACE VIEW ExpensesByStatus AS
+SELECT 
+    e.ExpenseID,
+    e.EmployeeID,
+    emp.FirstName,
+    emp.LastName,
+    es.StatusName AS CurrentStatus,
+    e.Amount,
+    e.Description,
+    e.ExpenseDate
+FROM 
+    Expense e
+JOIN 
+    Employee emp ON e.EmployeeID = emp.EmployeeID
+JOIN 
+    ExpenseStatus es ON e.StatusID = es.StatusID;
+
+-- 5. View: Total Expenses by Type
+CREATE OR REPLACE VIEW TotalExpensesByType AS
+SELECT 
+    et.TypeName AS ExpenseType,
+    SUM(e.Amount) AS TotalAmount
+FROM 
+    Expense e
+JOIN 
+    ExpenseType et ON e.ExpenseTypeID = et.ExpenseTypeID
+GROUP BY 
+    et.TypeName;
+
+-- 6. View: Approved Expenses Over Time
+CREATE OR REPLACE VIEW ApprovedExpensesOverTime AS
+SELECT 
+    e.ExpenseID,
+    emp.EmployeeID,
+    emp.FirstName,
+    emp.LastName,
+    e.Amount,
+    a.ApprovalDate
+FROM 
+    Expense e
+JOIN 
+    Approval a ON e.ExpenseID = a.ExpenseID
+JOIN 
+    Employee emp ON e.EmployeeID = emp.EmployeeID
+WHERE 
+    a.StatusID = (SELECT StatusID FROM ExpenseStatus WHERE StatusName = 'Approved')
+ORDER BY 
+    a.ApprovalDate;
+
+-- 7. View: Administrator Activity Log
+CREATE OR REPLACE VIEW AdministratorActivityLog AS
+SELECT 
+    al.AuditID,
+    admin.AdminID,
+    admin.AdminName,
+    al.ModifiedBy,
+    al.ModificationDate,
+    al.ActionTaken
+FROM 
+    AuditLog al
+JOIN 
+    Administrator admin ON al.AdminID = admin.AdminID
+ORDER BY 
+    al.ModificationDate DESC;
+
+-- 8. View: Reimbursement Details
+CREATE OR REPLACE VIEW ReimbursementDetails AS
+SELECT 
+    r.ReimbursementID,
+    e.EmployeeID,
+    emp.FirstName,
+    emp.LastName,
+    r.Amount AS ReimbursementAmount,
+    p.PaymentMethod,
+    p.PaymentDate
+FROM 
+    Reimbursement r
+JOIN 
+    Expense e ON r.ExpenseID = e.ExpenseID
+JOIN 
+    Employee emp ON e.EmployeeID = emp.EmployeeID
+JOIN 
+    Payment p ON r.ReimbursementID = p.ReimbursementID;
+    
