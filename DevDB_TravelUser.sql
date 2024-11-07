@@ -315,3 +315,78 @@ JOIN
 JOIN 
     Payment p ON r.ReimbursementID = p.ReimbursementID;
     
+
+-------------------Insert--------------------------
+INSERT INTO Department (DepartmentID, DepartmentName, Location) VALUES 
+    (1, 'Finance', 'New York'),
+    (2, 'IT', 'San Francisco'),
+    (3, 'HR', 'Chicago'),
+    (4, 'Marketing', 'Boston'),
+    (5, 'Operations', 'Austin'),
+    (6, 'Sales', 'Seattle'),
+    (7, 'Customer Support', 'Orlando'),
+    (8, 'Legal', 'Washington'),
+    (9, 'RD', 'San Jose'),
+    (10, 'Logistics', 'Dallas');
+
+
+
+INSERT INTO Employee (EmployeeID, FirstName, LastName, DepartmentID, Email, Phone) VALUES 
+(1, 'John', 'Doe', 1, 'john.doe@example.com', '1234567890'),
+(2, 'Jane', 'Smith', 2, 'jane.smith@example.com', '0987654321'),
+(3, 'Alice', 'Brown', 3, 'alice.brown@example.com', '1112223333'),
+(4, 'Bob', 'White', 4, 'bob.white@example.com', '2223334444'),
+(5, 'Carol', 'Black', 5, 'carol.black@example.com', '3334445555'),
+(6, 'David', 'Green', 6, 'david.green@example.com', '4445556666'),
+(7, 'Eve', 'Blue', 7, 'eve.blue@example.com', '5556667777'),
+(8, 'Frank', 'Yellow', 8, 'frank.yellow@example.com', '6667778888'),
+(9, 'Grace', 'Pink', 9, 'grace.pink@example.com', '7778889999'),
+(10, 'Hank', 'Gray', 10, 'hank.gray@example.com', '8889990000');
+
+
+
+INSERT INTO FinancialAuditor (AuditorID, FirstName, LastName, Email, Phone) VALUES 
+(1, 'Lily', 'Evans', 'lily.evans@example.com', '1112223333'),
+(2, 'James', 'Potter', 'james.potter@example.com', '2223334444'),
+(3, 'Albus', 'Dumbledore', 'albus.d@example.com', '3334445555'),
+(4, 'Minerva', 'McGonagall', 'minerva.m@example.com', '4445556666'),
+(5, 'Severus', 'Snape', 'severus.s@example.com', '5556667777'),
+(6, 'Sirius', 'Black', 'sirius.b@example.com', '6667778888'),
+(7, 'Remus', 'Lupin', 'remus.l@example.com', '7778889999'),
+(8, 'Horace', 'Slughorn', 'horace.s@example.com', '8889990000'),
+(9, 'Gilderoy', 'Lockhart', 'gilderoy.l@example.com', '9990001111'),
+(10, 'Rubeus', 'Hagrid', 'rubeus.h@example.com', '0001112222');
+
+
+
+
+-- Insert valid status types into ExpenseStatus
+INSERT INTO ExpenseStatus (StatusID, StatusName) VALUES (1, 'Pending');
+INSERT INTO ExpenseStatus (StatusID, StatusName) VALUES (2, 'Approved');
+INSERT INTO ExpenseStatus (StatusID, StatusName) VALUES (3, 'Rejected');
+
+
+
+-- Insert valid expense types into ExpenseType
+INSERT INTO ExpenseType (ExpenseTypeID, TypeName) VALUES (1, 'Meals');
+INSERT INTO ExpenseType (ExpenseTypeID, TypeName) VALUES (2, 'Travel');
+INSERT INTO ExpenseType (ExpenseTypeID, TypeName) VALUES (3, 'Accommodation');
+
+
+
+
+INSERT INTO Administrator (AdminID, AdminName, Role, Email) VALUES 
+(1, 'Admin1', 'Admin', 'admin1@example.com'),
+(2, 'Admin2', 'Viewer', 'admin2@example.com'),
+(3, 'Admin3', 'Deleter', 'admin3@example.com'),
+(4, 'Admin4', 'Admin', 'admin4@example.com'),
+(5, 'Admin5', 'Viewer', 'admin5@example.com'),
+(6, 'Admin6', 'Deleter', 'admin6@example.com'),
+(7, 'Admin7', 'Admin', 'admin7@example.com'),
+(8, 'Admin8', 'Viewer', 'admin8@example.com'),
+(9, 'Admin9', 'Deleter', 'admin9@example.com'),
+(10, 'Admin10', 'Admin', 'admin10@example.com');
+
+
+
+
