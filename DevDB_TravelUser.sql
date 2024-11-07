@@ -158,15 +158,60 @@ CREATE TABLE Payment (
 
 -----------------------------------------Views---------------------------------------------------------------------------------------
 
+-- Drop HighValueExpenses view if it exists
+BEGIN
+    EXECUTE IMMEDIATE 'DROP VIEW HighValueExpenses';
+EXCEPTION
+    WHEN OTHERS THEN
+        NULL; -- Ignore errors if the view does not exist
+END;
+/
 
-DROP VIEW HighValueExpenses;
-DROP VIEW ExpenseSummaryByEmployee;
-DROP VIEW PendingApprovals;
-DROP VIEW ExpensesByStatus;
-DROP VIEW TotalExpensesByType;
-DROP VIEW ApprovedExpensesOverTime;
-DROP VIEW AdministratorActivityLog;
-DROP VIEW ReimbursementDetails;
+-- Drop ExpenseSummaryByEmployee view if it exists
+BEGIN
+    EXECUTE IMMEDIATE 'DROP VIEW ExpenseSummaryByEmployee';
+EXCEPTION
+    WHEN OTHERS THEN
+        NULL;
+END;
+/
+
+-- Drop PendingApprovals view if it exists
+BEGIN
+    EXECUTE IMMEDIATE 'DROP VIEW PendingApprovals';
+EXCEPTION
+    WHEN OTHERS THEN
+        NULL;
+END;
+/
+
+-- Drop ExpensesByStatus view if it exists
+BEGIN
+    EXECUTE IMMEDIATE 'DROP VIEW ExpensesByStatus';
+EXCEPTION
+    WHEN OTHERS THEN
+        NULL;
+END;
+/
+
+-- Drop TotalExpensesByType view if it exists
+BEGIN
+    EXECUTE IMMEDIATE 'DROP VIEW TotalExpensesByType';
+EXCEPTION
+    WHEN OTHERS THEN
+        NULL;
+END;
+/
+
+-- Drop ApprovedExpensesOverTime view if it exists
+BEGIN
+    EXECUTE IMMEDIATE 'DROP VIEW ApprovedExpensesOverTime';
+EXCEPTION
+    WHEN OTHERS THEN
+        NULL;
+END;
+/
+
 
 -- 1. View: High-Value Expenses
 CREATE OR REPLACE VIEW HighValueExpenses AS
