@@ -387,6 +387,93 @@ INSERT INTO Administrator (AdminID, AdminName, Role, Email) VALUES
 (9, 'Admin9', 'Deleter', 'admin9@example.com'),
 (10, 'Admin10', 'Admin', 'admin10@example.com');
 
+INSERT INTO Expense (ExpenseID, EmployeeID, ExpenseTypeID, AdminID, Amount, ExpenseDate, Description, StatusID) VALUES 
+(1, 1, 1, 1, 150.00, TO_DATE('2024-01-15', 'YYYY-MM-DD'), 'Lunch meeting with client', 1),
+(2, 2, 2, 2, 2500.00, TO_DATE('2024-02-10', 'YYYY-MM-DD'), 'Flight for conference', 2),
+(3, 3, 3, 1, 500.00, TO_DATE('2024-02-15', 'YYYY-MM-DD'), 'Hotel stay for training', 3),
+(4, 4, 1, 2, 75.00, TO_DATE('2024-03-05', 'YYYY-MM-DD'), 'Team dinner', 1),
+(5, 5, 2, 1, 300.00, TO_DATE('2024-03-20', 'YYYY-MM-DD'), 'Tickets for client event', 2),
+(6, 6, 2, 1, 1200.00, TO_DATE('2024-04-02', 'YYYY-MM-DD'), 'Travel for on-site meeting', 3),
+(7, 7, 1, 2, 90.00, TO_DATE('2024-04-12', 'YYYY-MM-DD'), 'Working lunch with partner', 1),
+(8, 8, 3, 1, 600.00, TO_DATE('2024-04-22', 'YYYY-MM-DD'), 'Accommodation for training', 2),
+(9, 9, 2, 2, 2750.00, TO_DATE('2024-05-05', 'YYYY-MM-DD'), 'International flight',3),
+(10, 10, 1, 1, 200.00, TO_DATE('2024-05-15', 'YYYY-MM-DD'), 'Client entertainment', 1);
+
+
+
+INSERT INTO Approval (ApprovalID, ExpenseID, AuditorID, AdminID, StatusID, ApprovalDate, Comments) VALUES 
+(1, 1, 1, 1, 2, TO_DATE('2024-01-16', 'YYYY-MM-DD'), 'Approved by Auditor'),
+(2, 2, 2, 2, 2, TO_DATE('2024-02-11', 'YYYY-MM-DD'), 'Approved by Auditor'),
+(3, 3, 3, 1, 3, TO_DATE('2024-02-16', 'YYYY-MM-DD'), 'Rejected due to policy'),
+(4, 4, 4, 2, 1, TO_DATE('2024-03-06', 'YYYY-MM-DD'), 'Pending for more details'),
+(5, 5, 5, 1, 1, TO_DATE('2024-03-21', 'YYYY-MM-DD'), 'Pending for more details'),
+(6, 6, 6, 1, 3, TO_DATE('2024-04-03', 'YYYY-MM-DD'), 'Rejected due to policy'),
+(7, 7, 7, 2, 2, TO_DATE('2024-04-13', 'YYYY-MM-DD'), 'Approved by Auditor'),
+(8, 8, 8, 1, 1, TO_DATE('2024-04-23', 'YYYY-MM-DD'), 'Pending for more details'),
+(9, 9, 9, 2, 2, TO_DATE('2024-05-06', 'YYYY-MM-DD'), 'Approved by Auditor'),
+(10, 10, 10, 1, 1, TO_DATE('2024-05-16', 'YYYY-MM-DD'), 'Pending for more details');
+
+
+
+
+INSERT INTO AuditLog (AuditID, AuditorID, ExpenseID, AdminID, ModifiedBy, ModificationDate, ActionTaken) VALUES
+    (1, 1, 1, 1, 'Admin1', TO_DATE('2024-01-01', 'YYYY-MM-DD'), 'Created Expense'),
+    (2, 2, 2, 2, 'Admin2', TO_DATE('2024-01-02', 'YYYY-MM-DD'), 'Approved Expense'),
+    (3, 3, 3, 3, 'Admin3', TO_DATE('2024-01-03', 'YYYY-MM-DD'), 'Rejected Expense'),
+    (4, 4, 4, 4, 'Admin4', TO_DATE('2024-01-04', 'YYYY-MM-DD'), 'Modified Expense Details'),
+    (5, 5, 5, 5, 'Admin5', TO_DATE('2024-01-05', 'YYYY-MM-DD'), 'Processed Payment'),
+    (6, 6, 6, 6, 'Admin6', TO_DATE('2024-01-06', 'YYYY-MM-DD'), 'Submitted Reimbursement'),
+    (7, 7, 7, 7, 'Admin7', TO_DATE('2024-01-07', 'YYYY-MM-DD'), 'Manager Approval Pending'),
+    (8, 8, 8, 8, 'Admin8', TO_DATE('2024-01-08', 'YYYY-MM-DD'), 'Cancelled Expense'),
+    (9, 9, 9, 9, 'Admin9', TO_DATE('2024-01-09', 'YYYY-MM-DD'), 'Under Review'),
+    (10, 10, 10, 10, 'Admin10', TO_DATE('2024-01-10', 'YYYY-MM-DD'), 'Deferred Expense');
+    
+
+
+
+-- Insert sample data into Notifications table
+INSERT INTO Notifications (NotificationID, EmployeeID, AdminID, Message, NotificationDate, IsRead, AuditID) VALUES 
+(1, 1, 1, 'Expense approval required', TO_DATE('2024-01-15', 'YYYY-MM-DD'), 'N', 1),
+(2, 2, 1, 'Expense processed successfully', TO_DATE('2024-02-11', 'YYYY-MM-DD'), 'Y', 2),
+(3, 3, 2, 'More details required for expense', TO_DATE('2024-02-16', 'YYYY-MM-DD'), 'N', 3),
+(4, 4, 2, 'Audit has been completed', TO_DATE('2024-03-06', 'YYYY-MM-DD'), 'Y', 4),
+(5, 5, 3, 'Payment processed', TO_DATE('2024-03-21', 'YYYY-MM-DD'), 'N', 5),
+(6, 6, 3, 'Reimbursement request submitted', TO_DATE('2024-04-03', 'YYYY-MM-DD'), 'Y', 6),
+(7, 7, 4, 'Awaiting manager approval', TO_DATE('2024-04-13', 'YYYY-MM-DD'), 'N', 7),
+(8, 8, 4, 'Expense cancelled by user', TO_DATE('2024-04-23', 'YYYY-MM-DD'), 'Y', 8),
+(9, 9, 5, 'Expense under review', TO_DATE('2024-05-06', 'YYYY-MM-DD'), 'N', 9),
+(10, 10, 5, 'Expense deferred until next month', TO_DATE('2024-05-16', 'YYYY-MM-DD'), 'N', 10);
+
+
+
+
+
+INSERT INTO Reimbursement (ReimbursementID, ExpenseID, Amount, Status) VALUES
+    (1, 1, 150.00, 'Pending'),
+    (2, 2, 2500.00, 'Approved'),
+    (3, 3, 500.00, 'Paid'),
+    (4, 4, 75.00, 'Pending'),
+    (5, 5, 300.00, 'Approved'),
+    (6, 6, 1200.00, 'Paid'),
+    (7, 7, 90.00, 'Pending'),
+    (8, 8, 600.00, 'Approved'),
+    (9, 9, 2750.00, 'Paid'),
+    (10, 10, 200.00, 'Pending');
+
+
+
+INSERT INTO Payment (PaymentID, EmployeeID, Amount, PaymentDate, PaymentMethod, ReimbursementID) VALUES 
+(1, 1, 150.00, TO_DATE('2024-01-20', 'YYYY-MM-DD'), 'Direct Deposit', 1),
+(2, 2, 2500.00, TO_DATE('2024-02-15', 'YYYY-MM-DD'), 'Check', 2),
+(3, 3, 500.00, TO_DATE('2024-02-20', 'YYYY-MM-DD'), 'Direct Deposit', 3),
+(4, 4, 75.00, TO_DATE('2024-03-10', 'YYYY-MM-DD'), 'Cash', 4),
+(5, 5, 300.00, TO_DATE('2024-03-25', 'YYYY-MM-DD'), 'Direct Deposit', 5),
+(6, 6, 1200.00, TO_DATE('2024-04-05', 'YYYY-MM-DD'), 'Check', 6),
+(7, 7, 90.00, TO_DATE('2024-04-15', 'YYYY-MM-DD'), 'Direct Deposit', 7),
+(8, 8, 600.00, TO_DATE('2024-04-25', 'YYYY-MM-DD'), 'Direct Deposit', 8),
+(9, 9, 2750.00, TO_DATE('2024-05-10', 'YYYY-MM-DD'), 'Check', 9),
+(10, 10, 200.00, TO_DATE('2024-05-20', 'YYYY-MM-DD'), 'Cash', 10);
+
 
 
 
