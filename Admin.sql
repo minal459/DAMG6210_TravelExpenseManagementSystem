@@ -1,6 +1,20 @@
-DROP USER TravelUser CASCADE;
+BEGIN
+    -- Drop the user if it exists to avoid conflict
+    EXECUTE IMMEDIATE 'DROP USER TravelUser CASCADE';
+EXCEPTION
+    WHEN OTHERS THEN
+        NULL; -- Ignore errors if the user does not exist
+END;
+/
 
-CREATE USER TravelUser IDENTIFIED BY NeuBoston2024#;
+-- Now, create the user
+BEGIN
+    EXECUTE IMMEDIATE 'CREATE USER TravelUser IDENTIFIED BY NeuBoston2024#';
+EXCEPTION
+    WHEN OTHERS THEN
+        DBMS_OUTPUT.PUT_LINE('Error creating user TravelUser');
+END;
+/
 
 ALTER USER TravelUser DEFAULT TABLESPACE users QUOTA UNLIMITED ON users;
 
