@@ -1,6 +1,20 @@
-DROP USER TravelUser CASCADE;
+BEGIN
+    -- Drop the user if it exists to avoid conflict
+    EXECUTE IMMEDIATE 'DROP USER TravelUser CASCADE';
+EXCEPTION
+    WHEN OTHERS THEN
+        NULL; -- Ignore errors if the user does not exist
+END;
+/
 
-CREATE USER TravelUser IDENTIFIED BY NeuBoston2024#;
+-- Now, create the user
+BEGIN
+    EXECUTE IMMEDIATE 'CREATE USER TravelUser IDENTIFIED BY NeuBoston2024#';
+EXCEPTION
+    WHEN OTHERS THEN
+        DBMS_OUTPUT.PUT_LINE('Error creating user TravelUser');
+END;
+/
 
 ALTER USER TravelUser DEFAULT TABLESPACE users QUOTA UNLIMITED ON users;
 
@@ -14,17 +28,4 @@ GRANT CREATE SESSION, CREATE VIEW, CREATE TABLE, ALTER SESSION, CREATE SEQUENCE 
 GRANT CREATE SYNONYM, CREATE DATABASE LINK, RESOURCE, UNLIMITED TABLESPACE TO TravelUser;
 
 GRANT CREATE TABLE TO TravelUser;
-------------------------------------------------------------------------------------
 
-GRANT INSERT, SELECT, UPDATE, DELETE ON Administrator TO TravelUser;
-GRANT INSERT, SELECT, UPDATE, DELETE ON Approval TO TravelUser;
-GRANT INSERT, SELECT, UPDATE, DELETE ON AuditLog TO TravelUser;
-GRANT INSERT, SELECT, UPDATE, DELETE ON Department TO TravelUser;
-GRANT INSERT, SELECT, UPDATE, DELETE ON Employee TO TravelUser;
-GRANT INSERT, SELECT, UPDATE, DELETE ON Expense TO TravelUser;
-GRANT INSERT, SELECT, UPDATE, DELETE ON ExpenseStatus TO TravelUser;
-GRANT INSERT, SELECT, UPDATE, DELETE ON ExpenseType TO TravelUser;
-GRANT INSERT, SELECT, UPDATE, DELETE ON FinancialAuditor TO TravelUser;
-GRANT INSERT, SELECT, UPDATE, DELETE ON Notifications TO TravelUser;
-GRANT INSERT, SELECT, UPDATE, DELETE ON Payment TO TravelUser;
-GRANT INSERT, SELECT, UPDATE, DELETE ON Reimbursement TO TravelUser;
