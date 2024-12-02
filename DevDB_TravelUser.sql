@@ -486,6 +486,41 @@ EXCEPTION
 END;
 /
 
+-- Drop Trigger trg_flag_expense if it exists
+BEGIN
+    EXECUTE IMMEDIATE 'DROP TRIGGER trg_flag_expense';
+EXCEPTION
+    WHEN OTHERS THEN
+        NULL;
+END;
+/
+
+-- Drop Trigger trg_department_delete if it exists
+BEGIN
+    EXECUTE IMMEDIATE 'DROP TRIGGER trg_department_delete';
+EXCEPTION
+    WHEN OTHERS THEN
+        NULL;
+END;
+/
+
+-- Drop Trigger trg_prevent_self_approval if it exists
+BEGIN
+    EXECUTE IMMEDIATE 'DROP TRIGGER trg_prevent_self_approval';
+EXCEPTION
+    WHEN OTHERS THEN
+        NULL;
+END;
+/
+
+-- Drop Trigger trg_unique_expense_type if it exists
+BEGIN
+    EXECUTE IMMEDIATE 'DROP TRIGGER trg_unique_expense_type';
+EXCEPTION
+    WHEN OTHERS THEN
+        NULL;
+END;
+/
 
 
 ---------------------------Triggers Creation---------------------------------------------
@@ -597,3 +632,110 @@ BEGIN
 END;
 /
 
+
+--5. Expense Flagging for Review
+
+CREATE OR REPLACE TRIGGER trg_flag_high_value_expense
+AFTER INSERT OR UPDATE ON Expense
+FOR EACH ROW
+BEGIN
+    -- Check if the Amount exceeds 2500
+    IF :NEW.Amount > 2500 THEN
+        INSERT INTO AuditLog (
+            ExpenseID,
+            ModifiedBy,
+            ModificationDate,
+            ActionTaken
+        )
+        VALUES (
+            :NEW.ExpenseID,
+            'System', -- or use an appropriate admin/employee ID if available
+            SYSDATE,
+            'High-value expense flagged for review'
+        );
+    END IF;
+END;
+/
+
+
+--6. Enforce Valid Department Assignment
+CREATE OR REPLACE TRIGGER trg_department_delete
+FOR DELETE ON Department
+COMPOUND TRIGGER
+
+    -- Declare a collection to hold the DepartmentIDs being deleted
+    TYPE DeptIDTable IS TABLE OF Department.DepartmentID%TYPE;
+    dept_ids DeptIDTable := DeptIDTable();
+
+    BEFORE EACH ROW IS
+    BEGIN
+        -- Add the DepartmentID being deleted to the collection
+        dept_ids.EXTEND;
+        dept_ids(dept_ids.LAST) := :OLD.DepartmentID;
+    END BEFORE EACH ROW;
+
+    AFTER STATEMENT IS
+    BEGIN
+        -- Process the DepartmentIDs collected in the BEFORE EACH ROW phase
+        FOR i IN 1 .. dept_ids.COUNT LOOP
+            -- Set the DepartmentID to NULL in Employee table
+            UPDATE Employee
+            SET DepartmentID = NULL
+            WHERE DepartmentID = dept_ids(i);
+        END LOOP;
+    END AFTER STATEMENT;
+
+END trg_department_delete;
+/
+
+
+
+
+
+
+--7. Prevent Self-Approval of Expenses
+
+CREATE OR REPLACE TRIGGER trg_prevent_self_approval
+BEFORE INSERT OR UPDATE ON Approval
+FOR EACH ROW
+DECLARE
+    v_EmployeeID NUMBER; -- Variable to store the EmployeeID associated with the Expense
+BEGIN
+    -- Check if the ExpenseID exists
+    SELECT EmployeeID
+    INTO v_EmployeeID
+    FROM Expense
+    WHERE ExpenseID = :NEW.ExpenseID;
+
+    -- Check if the AdminID matches the EmployeeID
+    IF :NEW.AdminID = v_EmployeeID THEN
+        RAISE_APPLICATION_ERROR(-20003, 'Employees cannot approve their own expenses.');
+    END IF;
+EXCEPTION
+    WHEN NO_DATA_FOUND THEN
+        RAISE_APPLICATION_ERROR(-20004, 'Invalid ExpenseID: The specified ExpenseID does not exist.');
+END;
+/
+
+
+--8. Ensure Unique Expense Types
+
+CREATE OR REPLACE TRIGGER trg_unique_expense_type
+BEFORE INSERT OR UPDATE ON ExpenseType
+FOR EACH ROW
+DECLARE
+    v_Count NUMBER; -- Variable to hold the count of matching rows
+BEGIN
+    -- Check if a record with the same TypeName exists but with a different ExpenseTypeID
+    SELECT COUNT(*)
+    INTO v_Count
+    FROM ExpenseType
+    WHERE TypeName = :NEW.TypeName
+      AND ExpenseTypeID != NVL(:NEW.ExpenseTypeID, -1); -- Handle null ExpenseTypeID during INSERT
+
+    -- If a duplicate exists, raise an error
+    IF v_Count > 0 THEN
+        RAISE_APPLICATION_ERROR(-20004, 'Expense type must be unique.');
+    END IF;
+END;
+/
