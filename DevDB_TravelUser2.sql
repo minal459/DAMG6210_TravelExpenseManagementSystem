@@ -108,7 +108,9 @@ INSERT INTO AuditLog (AuditID, AuditorID, ExpenseID, AdminID, ModifiedBy, Modifi
     (7, 7, 7, 7, 'Admin7', TO_DATE('2024-01-07', 'YYYY-MM-DD'), 'Manager Approval Pending'),
     (8, 8, 8, 8, 'Admin8', TO_DATE('2024-01-08', 'YYYY-MM-DD'), 'Cancelled Expense'),
     (9, 9, 9, 9, 'Admin9', TO_DATE('2024-01-09', 'YYYY-MM-DD'), 'Under Review'),
-    (10, 10, 10, 10, 'Admin10', TO_DATE('2024-01-10', 'YYYY-MM-DD'), 'Deferred Expense');
+    (10, 10, 10, 10, 'Admin10', TO_DATE('2024-01-10', 'YYYY-MM-DD'), 'Deferred Expense'); 
+
+
     
 
 
@@ -157,5 +159,5 @@ INSERT INTO Payment (PaymentID, EmployeeID, Amount, PaymentDate, PaymentMethod, 
 (10, 10, 200.00, TO_DATE('2024-05-20', 'YYYY-MM-DD'), 'Cash', 10);
 
 
-
+SELECT * FROM Expense;
 

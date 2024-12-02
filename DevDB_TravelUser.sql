@@ -334,6 +334,7 @@ GROUP BY
     emp.EmployeeID, emp.FirstName, emp.LastName, et.TypeName;
 
 
+SELECT * FROM ExpenseSummaryByEmployee;
 
 -- 3. View: Pending Approvals
 CREATE OR REPLACE VIEW PendingApprovals AS
@@ -444,4 +445,155 @@ JOIN
 JOIN 
     Payment p ON r.ReimbursementID = p.ReimbursementID;
     
+
+
+
+---------------------Triggers -------------------------------
+
+-- Drop Trigger trg_expense_update if it exists
+BEGIN
+    EXECUTE IMMEDIATE 'DROP TRIGGER trg_expense_update';
+EXCEPTION
+    WHEN OTHERS THEN
+        NULL; -- Ignore errors if the trigger does not exist
+END;
+/
+
+-- Drop Trigger trg_status_change if it exists
+BEGIN
+    EXECUTE IMMEDIATE 'DROP TRIGGER trg_status_change';
+EXCEPTION
+    WHEN OTHERS THEN
+        NULL;
+END;
+/
+
+-- Drop Trigger trg_prevent_future_date if it exists
+BEGIN
+    EXECUTE IMMEDIATE 'DROP TRIGGER trg_prevent_future_date';
+EXCEPTION
+    WHEN OTHERS THEN
+        NULL;
+END;
+/
+
+-- Drop Trigger trg_reimbursement_amount if it exists
+BEGIN
+    EXECUTE IMMEDIATE 'DROP TRIGGER trg_reimbursement_amount';
+EXCEPTION
+    WHEN OTHERS THEN
+        NULL;
+END;
+/
+
+
+
+---------------------------Triggers Creation---------------------------------------------
+--1. Auto-Insertion of Audit Logs on Expense Modifications
+
+CREATE OR REPLACE TRIGGER trg_expense_update
+AFTER UPDATE ON Expense
+FOR EACH ROW
+BEGIN
+    -- Check if the Amount has been updated
+    IF :OLD.Amount != :NEW.Amount THEN
+        -- Attempt to update the corresponding record in the AuditLog table
+        UPDATE AuditLog
+        SET ModificationDate = SYSDATE,
+            ModifiedBy = 'System',
+            ActionTaken = 'Amount Updated'
+        WHERE ExpenseID = :OLD.ExpenseID;
+
+        -- Raise an error if no rows were updated
+        IF SQL%ROWCOUNT = 0 THEN
+            RAISE_APPLICATION_ERROR(-20001, 'No matching row exists in AuditLog for ExpenseID ' || :OLD.ExpenseID);
+        END IF;
+
+    -- Check if the StatusID has been updated
+    ELSIF :OLD.StatusID != :NEW.StatusID THEN
+        -- Attempt to update the corresponding record in the AuditLog table
+        UPDATE AuditLog
+        SET ModificationDate = SYSDATE,
+            ModifiedBy = 'System',
+            ActionTaken = 'Status Updated'
+        WHERE ExpenseID = :OLD.ExpenseID;
+
+        -- Raise an error if no rows were updated
+        IF SQL%ROWCOUNT = 0 THEN
+            RAISE_APPLICATION_ERROR(-20001, 'No matching row exists in AuditLog for ExpenseID ' || :OLD.ExpenseID);
+        END IF;
+
+    -- Handle other updates
+    ELSE
+        -- Attempt to update the corresponding record in the AuditLog table
+        UPDATE AuditLog
+        SET ModificationDate = SYSDATE,
+            ModifiedBy = 'System',
+            ActionTaken = 'Other Update'
+        WHERE ExpenseID = :OLD.ExpenseID;
+
+        -- Raise an error if no rows were updated
+        IF SQL%ROWCOUNT = 0 THEN
+            RAISE_APPLICATION_ERROR(-20001, 'No matching row exists in AuditLog for ExpenseID ' || :OLD.ExpenseID);
+        END IF;
+    END IF;
+END;
+/
+
+--2. Audit Trail for Expense Status Changes
+
+
+CREATE OR REPLACE TRIGGER trg_status_change
+AFTER UPDATE ON Expense
+FOR EACH ROW
+BEGIN
+    IF :OLD.StatusID != :NEW.StatusID THEN
+        -- Attempt to update the existing row in AuditLog
+        UPDATE AuditLog
+        SET ModifiedBy = 'System',
+            ModificationDate = SYSDATE,
+            ActionTaken = 'Status Changed'
+        WHERE ExpenseID = :OLD.ExpenseID;
+
+        -- Optionally raise an error if no rows were updated
+        IF SQL%ROWCOUNT = 0 THEN
+            RAISE_APPLICATION_ERROR(-20002, 'No matching row exists in AuditLog for ExpenseID ' || :OLD.ExpenseID);
+        END IF;
+    END IF;
+END;
+/
+
+
+
+--3. Prevent Future Expense Dates
+
+CREATE OR REPLACE TRIGGER trg_prevent_future_date
+BEFORE INSERT OR UPDATE ON Expense
+FOR EACH ROW
+BEGIN
+    IF :NEW.ExpenseDate > SYSDATE THEN
+        RAISE_APPLICATION_ERROR(-20001, 'ExpenseDate cannot be in the future.');
+    END IF;
+END;
+/
+
+--4. Reimbursement Amount Validation
+CREATE OR REPLACE TRIGGER trg_reimbursement_amount
+BEFORE INSERT OR UPDATE ON Reimbursement
+FOR EACH ROW
+DECLARE
+    v_ExpenseAmount NUMBER; -- Variable to hold the Expense amount
+BEGIN
+    -- Fetch the Expense Amount from the Expense table
+    SELECT Amount
+    INTO v_ExpenseAmount
+    FROM Expense
+    WHERE ExpenseID = :NEW.ExpenseID;
+
+    -- Compare Reimbursement Amount with Expense Amount
+    IF :NEW.Amount > v_ExpenseAmount THEN
+        RAISE_APPLICATION_ERROR(-20002, 'Reimbursement amount cannot exceed original expense amount.');
+    END IF;
+END;
+/
 
