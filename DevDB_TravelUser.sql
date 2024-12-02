@@ -882,7 +882,7 @@ SELECT NotificationManagement.GetUnreadNotificationsCount(1) AS UnreadCount FROM
 SELECT NotificationManagement.GetNotificationDetails(201) AS NotificationDetails FROM DUAL;
 
 ---2. AuditLogManagement Package
---Specification
+--Package Specification
 CREATE OR REPLACE PACKAGE AuditLogManagement IS
     -- Functions
     FUNCTION GetAuditLogByExpense(p_ExpenseID NUMBER) RETURN SYS_REFCURSOR;
