@@ -739,3 +739,145 @@ BEGIN
     END IF;
 END;
 /
+
+----------Packages,Procedures,Functions-------------
+--1. NotificationManagement Package
+--Specification
+CREATE OR REPLACE PACKAGE NotificationManagement IS
+    -- Functions
+    FUNCTION GetUnreadNotificationsCount(p_EmployeeID NUMBER) RETURN NUMBER;
+    FUNCTION GetNotificationDetails(p_NotificationID NUMBER) RETURN VARCHAR2;
+
+    -- Procedures
+    PROCEDURE CreateNotification(p_NotificationID NUMBER, p_EmployeeID NUMBER, p_AdminID NUMBER, p_Message VARCHAR2);
+    PROCEDURE MarkNotificationAsRead(p_NotificationID NUMBER);
+END NotificationManagement;
+/
+
+---Body
+CREATE OR REPLACE PACKAGE BODY NotificationManagement IS
+    -- Function to get unread notifications count for an employee
+    FUNCTION GetUnreadNotificationsCount(p_EmployeeID NUMBER) RETURN NUMBER IS
+        v_Count NUMBER;
+    BEGIN
+        -- Query to count unread notifications for the given Employee ID
+        SELECT COUNT(*)
+        INTO v_Count
+        FROM Notifications
+        WHERE EmployeeID = p_EmployeeID AND IsRead = 'N';
+
+        RETURN v_Count;
+    EXCEPTION
+        WHEN NO_DATA_FOUND THEN
+            RETURN 0; -- Return 0 if no unread notifications are found
+    END;
+
+    -- Function to get notification details
+    FUNCTION GetNotificationDetails(p_NotificationID NUMBER) RETURN VARCHAR2 IS
+        v_Details VARCHAR2(255);
+    BEGIN
+        -- Query to fetch notification details for the given Notification ID
+        SELECT Message || ', Date: ' || TO_CHAR(NotificationDate, 'YYYY-MM-DD')
+        INTO v_Details
+        FROM Notifications
+        WHERE NotificationID = p_NotificationID;
+
+        RETURN v_Details;
+    EXCEPTION
+        WHEN NO_DATA_FOUND THEN
+            RETURN 'Notification Not Found'; -- Return default message if ID is not found
+    END;
+
+    -- Procedure to create a notification with manually provided NotificationID
+    PROCEDURE CreateNotification(
+        p_NotificationID NUMBER,
+        p_EmployeeID NUMBER,
+        p_AdminID NUMBER,
+        p_Message VARCHAR2
+    ) IS
+    BEGIN
+        -- Insert new notification into the Notifications table
+        INSERT INTO Notifications (
+            NotificationID,
+            EmployeeID,
+            AdminID,
+            Message,
+            NotificationDate,
+            IsRead
+        )
+        VALUES (
+            p_NotificationID,
+            p_EmployeeID,
+            p_AdminID,
+            p_Message,
+            SYSDATE,
+            'N'
+        );
+
+        -- Output success message
+        DBMS_OUTPUT.PUT_LINE('Notification Created Successfully with ID ' || p_NotificationID);
+    EXCEPTION
+        WHEN OTHERS THEN
+            DBMS_OUTPUT.PUT_LINE('Error: Unable to create notification. ' || SQLERRM);
+    END;
+
+    -- Procedure to mark a notification as read
+    PROCEDURE MarkNotificationAsRead(p_NotificationID NUMBER) IS
+    BEGIN
+        -- Update IsRead status to 'Y' for the given Notification ID
+        UPDATE Notifications
+        SET IsRead = 'Y'
+        WHERE NotificationID = p_NotificationID;
+
+        IF SQL%ROWCOUNT = 0 THEN
+            -- Output message if no rows were updated
+            DBMS_OUTPUT.PUT_LINE('Notification ID ' || p_NotificationID || ' not found.');
+        ELSE
+            -- Output success message
+            DBMS_OUTPUT.PUT_LINE('Notification Marked as Read for ID ' || p_NotificationID);
+        END IF;
+    EXCEPTION
+        WHEN OTHERS THEN
+            DBMS_OUTPUT.PUT_LINE('Error: Unable to mark notification as read. ' || SQLERRM);
+    END;
+
+END NotificationManagement;
+/
+
+
+--------------usage---
+--1.Create a Notification
+BEGIN
+    NotificationManagement.CreateNotification(
+        p_NotificationID => 201,  -- Manually assigned Notification ID
+        p_EmployeeID => 1,       -- Employee ID
+        p_AdminID => 2,          -- Admin ID
+        p_Message => 'Your expense has been approved and is ready for review.'
+    );
+    ROLLBACK;
+END;
+/
+
+
+----delete--
+DELETE FROM Notifications
+WHERE NotificationID = 201;
+
+-----2. Mark a Notification as Read
+
+BEGIN
+    NotificationManagement.MarkNotificationAsRead(p_NotificationID => 201);
+    ROLLBACK;
+END;
+/
+
+----3. Fetch Count of Unread Notifications
+
+SELECT NotificationManagement.GetUnreadNotificationsCount(1) AS UnreadCount FROM DUAL;
+
+
+
+----4. Get Notification Details
+
+SELECT NotificationManagement.GetNotificationDetails(201) AS NotificationDetails FROM DUAL;
+
