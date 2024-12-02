@@ -881,3 +881,113 @@ SELECT NotificationManagement.GetUnreadNotificationsCount(1) AS UnreadCount FROM
 
 SELECT NotificationManagement.GetNotificationDetails(201) AS NotificationDetails FROM DUAL;
 
+---2. AuditLogManagement Package
+--Specification
+CREATE OR REPLACE PACKAGE AuditLogManagement IS
+    -- Functions
+    FUNCTION GetAuditLogByExpense(p_ExpenseID NUMBER) RETURN SYS_REFCURSOR;
+    FUNCTION GetAuditCountByAdmin(p_AdminID NUMBER) RETURN NUMBER;
+
+    -- Procedures
+    PROCEDURE AddAuditLog(p_ExpenseID NUMBER, p_AdminID NUMBER, p_ActionTaken VARCHAR2);
+    PROCEDURE ClearAuditLogsOlderThan(p_Days NUMBER);
+END AuditLogManagement;
+/
+
+---Body
+CREATE OR REPLACE PACKAGE BODY AuditLogManagement IS
+    -- Function to get audit logs for a specific expense
+    FUNCTION GetAuditLogByExpense(p_ExpenseID NUMBER) RETURN SYS_REFCURSOR IS
+        v_Cursor SYS_REFCURSOR;
+    BEGIN
+        OPEN v_Cursor FOR
+            SELECT AuditID, ExpenseID, AdminID, ActionTaken, ModificationDate
+            FROM AuditLog
+            WHERE ExpenseID = p_ExpenseID;
+
+        RETURN v_Cursor;
+    END;
+
+    -- Function to count audit logs created by a specific admin
+    FUNCTION GetAuditCountByAdmin(p_AdminID NUMBER) RETURN NUMBER IS
+        v_Count NUMBER;
+    BEGIN
+        SELECT COUNT(*)
+        INTO v_Count
+        FROM AuditLog
+        WHERE AdminID = p_AdminID;
+
+        RETURN v_Count;
+    EXCEPTION
+        WHEN NO_DATA_FOUND THEN
+            RETURN 0;
+    END;
+
+    -- Procedure to add an audit log
+    PROCEDURE AddAuditLog(p_ExpenseID NUMBER, p_AdminID NUMBER, p_ActionTaken VARCHAR2) IS
+    BEGIN
+        INSERT INTO AuditLog (AuditID, ExpenseID, AdminID, ModifiedBy, ModificationDate, ActionTaken)
+        VALUES (AuditLog_SEQ.NEXTVAL, p_ExpenseID, p_AdminID, 'System', SYSDATE, p_ActionTaken);
+
+        DBMS_OUTPUT.PUT_LINE('Audit Log Added for ExpenseID: ' || p_ExpenseID);
+    END;
+
+    -- Procedure to clear audit logs older than a specified number of days
+    PROCEDURE ClearAuditLogsOlderThan(p_Days NUMBER) IS
+    BEGIN
+        DELETE FROM AuditLog
+        WHERE ModificationDate < SYSDATE - p_Days;
+
+        DBMS_OUTPUT.PUT_LINE('Audit Logs Older Than ' || p_Days || ' Days Deleted');
+    END;
+
+END AuditLogManagement;
+/
+
+---Usage
+-- Fetch audit logs for a specific expense
+-- Declare a variable to hold the result (REFCURSOR)
+VARIABLE v_cursor REFCURSOR;
+
+-- Call the function to fetch audit logs for ExpenseID = 1
+BEGIN
+    :v_cursor := AuditLogManagement.GetAuditLogByExpense(1);
+    ROLLBACK;
+END;
+/
+
+-- Print the contents of the REFCURSOR
+PRINT v_cursor;
+
+
+-- Count audit logs created by an admin
+SELECT AuditLogManagement.GetAuditCountByAdmin(1) AS AdminAuditCount FROM DUAL;
+
+-- Add a new audit log
+BEGIN
+    AuditLogManagement.AddAuditLog(
+        p_ExpenseID => 1,    -- The Expense ID for which the log is being created
+        p_AdminID => 2,      -- Admin ID creating the log
+        p_ActionTaken => 'Expense Approved' -- Description of the action taken
+    );
+    ROLLBACK;
+END;
+/
+
+SELECT * FROM AuditLog;
+
+DELETE FROM AuditLog
+WHERE ExpenseID = 1
+  AND AdminID = 2
+  AND ActionTaken = 'Expense Approved';
+
+-- Commit the transaction to save the changes
+COMMIT;
+
+
+-- Clear audit logs older than 30 days
+BEGIN
+    AuditLogManagement.ClearAuditLogsOlderThan(30);
+    ROLLBACK;
+END;
+
