@@ -740,8 +740,88 @@ BEGIN
 END;
 /
 
-----------Packages,Procedures,Functions-------------
---1. NotificationManagement Package
+
+---------------- Stored procedures, functions, packages --------------------------------------
+--Packages
+--Package Specification
+--1. ExpenseManagementPkg
+CREATE OR REPLACE PACKAGE ExpenseManagementPkg AS
+    PROCEDURE ApproveExpense(p_ExpenseID IN NUMBER, p_AdminID IN NUMBER);
+    PROCEDURE CalculateTotalExpenses(p_EmployeeID IN NUMBER, o_TotalAmount OUT NUMBER);
+    FUNCTION GetEmployeeEmail(p_EmployeeID IN NUMBER) RETURN VARCHAR2;
+    FUNCTION IsExpenseFlagged(p_ExpenseID IN NUMBER) RETURN BOOLEAN;
+END ExpenseManagementPkg;
+/
+
+--Package Body
+
+CREATE OR REPLACE PACKAGE BODY ExpenseManagementPkg AS
+
+    -- Procedure to approve an expense
+    PROCEDURE ApproveExpense(p_ExpenseID IN NUMBER, p_AdminID IN NUMBER) IS
+    BEGIN
+        -- Update the Expense table
+        UPDATE Expense
+        SET StatusID = (SELECT StatusID FROM ExpenseStatus WHERE StatusName = 'Approved'),
+            AdminID = p_AdminID
+        WHERE ExpenseID = p_ExpenseID;
+
+        -- Update the AuditLog table for the same ExpenseID
+        UPDATE AuditLog
+        SET ModifiedBy = 'Admin',
+            ModificationDate = SYSDATE,
+            ActionTaken = 'Expense Approved'
+        WHERE ExpenseID = p_ExpenseID;
+
+        -- Check if the update was successful
+        IF SQL%ROWCOUNT = 0 THEN
+            RAISE_APPLICATION_ERROR(-20001, 'No matching record found in AuditLog for ExpenseID: ' || p_ExpenseID);
+        END IF;
+    END ApproveExpense;
+
+    -- Procedure to calculate total expenses for an employee
+    PROCEDURE CalculateTotalExpenses(p_EmployeeID IN NUMBER, o_TotalAmount OUT NUMBER) IS
+    BEGIN
+        SELECT SUM(Amount)
+        INTO o_TotalAmount
+        FROM Expense
+        WHERE EmployeeID = p_EmployeeID;
+
+        IF o_TotalAmount IS NULL THEN
+            o_TotalAmount := 0;
+        END IF;
+    END CalculateTotalExpenses;
+
+    -- Function to get the email of an employee
+    FUNCTION GetEmployeeEmail(p_EmployeeID IN NUMBER) RETURN VARCHAR2 IS
+        v_Email VARCHAR2(100);
+    BEGIN
+        SELECT Email
+        INTO v_Email
+        FROM Employee
+        WHERE EmployeeID = p_EmployeeID;
+
+        RETURN v_Email;
+    END GetEmployeeEmail;
+
+    -- Function to check if an expense is flagged
+    FUNCTION IsExpenseFlagged(p_ExpenseID IN NUMBER) RETURN BOOLEAN IS
+        v_Flagged NUMBER; -- Variable to hold the flagged status (as NUMBER)
+    BEGIN
+        -- Check if the expense is flagged
+        SELECT CASE WHEN Amount > 2500 THEN 1 ELSE 0 END
+        INTO v_Flagged
+        FROM Expense
+        WHERE ExpenseID = p_ExpenseID;
+
+        -- Convert the NUMBER to BOOLEAN
+        RETURN v_Flagged = 1;
+    END IsExpenseFlagged;
+
+END ExpenseManagementPkg;
+/
+
+--2. NotificationManagement Package
 --Specification
 CREATE OR REPLACE PACKAGE NotificationManagement IS
     -- Functions
@@ -844,44 +924,7 @@ CREATE OR REPLACE PACKAGE BODY NotificationManagement IS
 END NotificationManagement;
 /
 
-
---------------usage---
---1.Create a Notification
-BEGIN
-    NotificationManagement.CreateNotification(
-        p_NotificationID => 201,  -- Manually assigned Notification ID
-        p_EmployeeID => 1,       -- Employee ID
-        p_AdminID => 2,          -- Admin ID
-        p_Message => 'Your expense has been approved and is ready for review.'
-    );
-    ROLLBACK;
-END;
-/
-
-
-----delete--
-DELETE FROM Notifications
-WHERE NotificationID = 201;
-
------2. Mark a Notification as Read
-
-BEGIN
-    NotificationManagement.MarkNotificationAsRead(p_NotificationID => 201);
-    ROLLBACK;
-END;
-/
-
-----3. Fetch Count of Unread Notifications
-
-SELECT NotificationManagement.GetUnreadNotificationsCount(1) AS UnreadCount FROM DUAL;
-
-
-
-----4. Get Notification Details
-
-SELECT NotificationManagement.GetNotificationDetails(201) AS NotificationDetails FROM DUAL;
-
----2. AuditLogManagement Package
+---3. AuditLogManagement Package
 --Package Specification
 CREATE OR REPLACE PACKAGE AuditLogManagement IS
     -- Functions
@@ -944,50 +987,42 @@ CREATE OR REPLACE PACKAGE BODY AuditLogManagement IS
 END AuditLogManagement;
 /
 
----Usage
--- Fetch audit logs for a specific expense
--- Declare a variable to hold the result (REFCURSOR)
-VARIABLE v_cursor REFCURSOR;
-
--- Call the function to fetch audit logs for ExpenseID = 1
+-----------------------------------------------Employee Policy------------------------------
+CREATE OR REPLACE FUNCTION Restricted_Expense_Policy (
+    schema_name IN VARCHAR2,
+    table_name IN VARCHAR2
+)
+RETURN VARCHAR2
+AS
+    employee_id VARCHAR2(100);
 BEGIN
-    :v_cursor := AuditLogManagement.GetAuditLogByExpense(1);
-    ROLLBACK;
+    -- Check the current session user
+    IF SYS_CONTEXT('USERENV', 'SESSION_USER') = 'DATAVIEWERUSER' THEN
+        -- Restrict DataViewerUser to a specific employee's data
+        employee_id := '1'; -- Replace with the specific employee_id for DataViewerUser
+        RETURN 'EMPLOYEEID = ''' || employee_id || '''';
+    ELSIF SYS_CONTEXT('USERENV', 'SESSION_USER') = 'TRAVELUSER' THEN
+        -- TravelUser has access to all rows
+        RETURN NULL;
+    ELSE
+        -- Deny access for all other users
+        RETURN '1=2';
+    END IF;
 END;
 /
 
--- Print the contents of the REFCURSOR
-PRINT v_cursor;
 
-
--- Count audit logs created by an admin
-SELECT AuditLogManagement.GetAuditCountByAdmin(1) AS AdminAuditCount FROM DUAL;
-
--- Add a new audit log
 BEGIN
-    AuditLogManagement.AddAuditLog(
-        p_ExpenseID => 1,    -- The Expense ID for which the log is being created
-        p_AdminID => 2,      -- Admin ID creating the log
-        p_ActionTaken => 'Expense Approved' -- Description of the action taken
+    DBMS_RLS.ADD_POLICY(
+        object_schema   => 'TravelUser',
+        object_name     => 'Expense',
+        policy_name     => 'Restricted_Expense_Access',
+        function_schema => 'TravelUser', -- Schema where the function resides
+        policy_function => 'Restricted_Expense_Policy',
+        statement_types => 'SELECT, UPDATE'
     );
-    ROLLBACK;
 END;
 /
 
-SELECT * FROM AuditLog;
 
-DELETE FROM AuditLog
-WHERE ExpenseID = 1
-  AND AdminID = 2
-  AND ActionTaken = 'Expense Approved';
-
--- Commit the transaction to save the changes
-COMMIT;
-
-
--- Clear audit logs older than 30 days
-BEGIN
-    AuditLogManagement.ClearAuditLogsOlderThan(30);
-    ROLLBACK;
-END;
 
