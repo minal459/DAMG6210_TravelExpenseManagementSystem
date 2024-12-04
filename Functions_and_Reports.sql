@@ -417,4 +417,295 @@ BEGIN
 END;
 /
 
+-----------------------Get Employee specific data------------------------
+
+SET SERVEROUTPUT ON;
+
+DECLARE
+    -- Variables for testing the package
+    v_TotalAmount NUMBER;
+    v_EmployeeEmail VARCHAR2(100);
+    v_IsFlagged BOOLEAN;
+    v_FlaggedStatus VARCHAR2(10); -- For printing the boolean result as text
+
+    -- Test data
+    v_EmployeeID NUMBER := 1; -- Example Employee ID
+    v_ExpenseID NUMBER := 2;  -- Example Expense ID
+    v_AdminID NUMBER := 1;    -- Example Admin ID
+BEGIN
+    -- Approve an Expense
+    DBMS_OUTPUT.PUT_LINE('--- Approve an Expense ---');
+    BEGIN
+        ExpenseManagementPkg.ApproveExpense(p_ExpenseID => v_ExpenseID, p_AdminID => v_AdminID);
+        DBMS_OUTPUT.PUT_LINE('Expense ' || v_ExpenseID || ' has been successfully approved by Admin ' || v_AdminID);
+    EXCEPTION
+        WHEN OTHERS THEN
+            DBMS_OUTPUT.PUT_LINE('Error approving expense: ' || SQLERRM);
+    END;
+
+    -- Calculate Total Expenses for an Employee
+    DBMS_OUTPUT.PUT_LINE('');
+    DBMS_OUTPUT.PUT_LINE('--- Calculate Total Expenses for an Employee ---');
+    ExpenseManagementPkg.CalculateTotalExpenses(p_EmployeeID => v_EmployeeID, o_TotalAmount => v_TotalAmount);
+    DBMS_OUTPUT.PUT_LINE('Total expenses for Employee ID ' || v_EmployeeID || ': $' || NVL(v_TotalAmount, 0));
+
+    -- Get the Email of an Employee
+    DBMS_OUTPUT.PUT_LINE('');
+    DBMS_OUTPUT.PUT_LINE('--- Get Employee Email ---');
+    BEGIN
+        v_EmployeeEmail := ExpenseManagementPkg.GetEmployeeEmail(p_EmployeeID => v_EmployeeID);
+        DBMS_OUTPUT.PUT_LINE('Email for Employee ID ' || v_EmployeeID || ': ' || v_EmployeeEmail);
+    EXCEPTION
+        WHEN OTHERS THEN
+            DBMS_OUTPUT.PUT_LINE('Error retrieving email: ' || SQLERRM);
+    END;
+
+    -- Check if an Expense is Flagged
+    DBMS_OUTPUT.PUT_LINE('');
+    DBMS_OUTPUT.PUT_LINE('--- Check if an Expense is Flagged ---');
+    v_IsFlagged := ExpenseManagementPkg.IsExpenseFlagged(p_ExpenseID => v_ExpenseID);
+    v_FlaggedStatus := CASE WHEN v_IsFlagged THEN 'Yes' ELSE 'No' END;
+    DBMS_OUTPUT.PUT_LINE('Is Expense ID ' || v_ExpenseID || ' flagged? ' || v_FlaggedStatus);
+
+END;
+/
+
+------------------------- Analysis Reports ---------------------------
+--Top 5 Expenses by Amount
+CREATE OR REPLACE FUNCTION get_top_5_expenses RETURN SYS_REFCURSOR AS
+    v_cursor SYS_REFCURSOR; -- Declare a cursor to hold the query result
+BEGIN
+    -- Open the cursor for the top 5 expenses by amount
+    OPEN v_cursor FOR
+        SELECT ExpenseID, EmployeeID, Amount, Description
+        FROM Expense
+        ORDER BY Amount DESC
+        FETCH FIRST 5 ROWS ONLY;
+
+    -- Return the cursor
+    RETURN v_cursor;
+END get_top_5_expenses;
+/
+
+DECLARE
+    v_cursor SYS_REFCURSOR;         -- Cursor to hold the result from the function
+    v_expense_id NUMBER;            -- Variable to hold the Expense ID
+    v_employee_id NUMBER;           -- Variable to hold the Employee ID
+    v_amount NUMBER;                -- Variable to hold the Amount
+    v_description VARCHAR2(200);    -- Variable to hold the Description
+BEGIN
+    -- Call the function to get the top 5 expenses
+    v_cursor := get_top_5_expenses;
+
+    -- Display report header
+    DBMS_OUTPUT.PUT_LINE('Top 5 Expenses by Amount:');
+
+    -- Fetch and display each record
+    LOOP
+        FETCH v_cursor INTO v_expense_id, v_employee_id, v_amount, v_description;
+        EXIT WHEN v_cursor%NOTFOUND;
+
+        -- Print each expense's details
+        DBMS_OUTPUT.PUT_LINE('Expense ID: ' || v_expense_id || 
+                             ', Employee ID: ' || v_employee_id || 
+                             ', Amount: $' || v_amount || 
+                             ', Description: ' || v_description);
+    END LOOP;
+
+    -- Close the cursor
+    CLOSE v_cursor;
+END;
+/
+
+
+
+
+
+--Top 5 Departments by Total Expenses
+
+CREATE OR REPLACE FUNCTION get_top_5_departments_by_expenses RETURN SYS_REFCURSOR AS
+    v_cursor SYS_REFCURSOR; -- Declare a cursor to hold the query result
+BEGIN
+    -- Open the cursor for the top 5 departments by total expenses
+    OPEN v_cursor FOR
+        SELECT d.DepartmentName, SUM(e.Amount) AS TotalAmount
+        FROM Expense e
+        JOIN Employee emp ON e.EmployeeID = emp.EmployeeID
+        JOIN Department d ON emp.DepartmentID = d.DepartmentID
+        GROUP BY d.DepartmentName
+        ORDER BY SUM(e.Amount) DESC
+        FETCH FIRST 5 ROWS ONLY;
+
+    -- Return the cursor
+    RETURN v_cursor;
+END get_top_5_departments_by_expenses;
+/
+
+DECLARE
+    v_cursor SYS_REFCURSOR;         -- Cursor to hold the result from the function
+    v_department_name VARCHAR2(100); -- Variable to hold the Department Name
+    v_total_amount NUMBER;           -- Variable to hold the Total Expenses
+BEGIN
+    -- Call the function to get the top 5 departments by total expenses
+    v_cursor := get_top_5_departments_by_expenses;
+
+    -- Display report header
+    DBMS_OUTPUT.PUT_LINE('Top 5 Departments by Total Expenses:');
+
+    -- Fetch and display each record
+    LOOP
+        FETCH v_cursor INTO v_department_name, v_total_amount;
+        EXIT WHEN v_cursor%NOTFOUND;
+
+        -- Print each department's details
+        DBMS_OUTPUT.PUT_LINE('Department: ' || v_department_name || ', Total Expenses: $' || v_total_amount);
+    END LOOP;
+
+    -- Close the cursor
+    CLOSE v_cursor;
+END;
+/
+
+--Top 5 Employees by Total Expenses
+
+CREATE OR REPLACE FUNCTION get_top_5_employees_by_expenses RETURN SYS_REFCURSOR AS
+    v_cursor SYS_REFCURSOR; -- Declare a cursor to hold the query result
+BEGIN
+    -- Open the cursor for the top 5 employees by total expenses
+    OPEN v_cursor FOR
+        SELECT e.EmployeeID, SUM(ex.Amount) AS TotalAmount
+        FROM Expense ex
+        JOIN Employee e ON ex.EmployeeID = e.EmployeeID
+        GROUP BY e.EmployeeID
+        ORDER BY SUM(ex.Amount) DESC
+        FETCH FIRST 5 ROWS ONLY;
+
+    -- Return the cursor
+    RETURN v_cursor;
+END get_top_5_employees_by_expenses;
+/
+
+DECLARE
+    v_cursor SYS_REFCURSOR;         -- Cursor to hold the result from the function
+    v_employee_id NUMBER;           -- Variable to hold the Employee ID
+    v_total_amount NUMBER;          -- Variable to hold the Total Expenses
+BEGIN
+    -- Call the function to get the top 5 employees by total expenses
+    v_cursor := get_top_5_employees_by_expenses;
+
+    -- Display report header
+    DBMS_OUTPUT.PUT_LINE('Top 5 Employees by Total Expenses:');
+
+    -- Fetch and display each record
+    LOOP
+        FETCH v_cursor INTO v_employee_id, v_total_amount;
+        EXIT WHEN v_cursor%NOTFOUND;
+
+        -- Print each employee's details
+        DBMS_OUTPUT.PUT_LINE('Employee ID: ' || v_employee_id || ', Total Expenses: $' || v_total_amount);
+    END LOOP;
+
+    -- Close the cursor
+    CLOSE v_cursor;
+END;
+/
+
+
+
+
+--Top 5 Approved Expenses
+
+CREATE OR REPLACE FUNCTION get_top_5_approved_expenses RETURN SYS_REFCURSOR AS
+    v_cursor SYS_REFCURSOR; -- Declare a cursor to hold the query result
+BEGIN
+    -- Open the cursor for the top 5 approved expenses
+    OPEN v_cursor FOR
+        SELECT ExpenseID, EmployeeID, Amount, Description
+        FROM Expense
+        WHERE StatusID = 2 -- Approved
+        ORDER BY Amount DESC
+        FETCH FIRST 5 ROWS ONLY;
+
+    -- Return the cursor
+    RETURN v_cursor;
+END get_top_5_approved_expenses;
+/
+
+DECLARE
+    v_cursor SYS_REFCURSOR;         -- Cursor to hold the result from the function
+    v_expense_id NUMBER;            -- Variable to hold the Expense ID
+    v_amount NUMBER;                -- Variable to hold the Amount
+    v_employee_id NUMBER;           -- Variable to hold the Employee ID
+    v_description VARCHAR2(200);    -- Variable to hold the Description
+BEGIN
+    -- Call the function to get the top 5 approved expenses
+    v_cursor := get_top_5_approved_expenses;
+
+    -- Display report header
+    DBMS_OUTPUT.PUT_LINE('Top 5 Approved Expenses:');
+
+    -- Fetch and display each record
+    LOOP
+        FETCH v_cursor INTO v_expense_id, v_employee_id, v_amount, v_description;
+        EXIT WHEN v_cursor%NOTFOUND;
+
+        -- Print each expense's details
+        DBMS_OUTPUT.PUT_LINE('Expense ID: ' || v_expense_id || 
+                             ', Employee ID: ' || v_employee_id || 
+                             ', Amount: $' || v_amount || 
+                             ', Description: ' || v_description);
+    END LOOP;
+
+    -- Close the cursor
+    CLOSE v_cursor;
+END;
+/
+
+--Top 5 Pending Expenses by Amount
+
+CREATE OR REPLACE FUNCTION get_top_5_pending_expenses RETURN SYS_REFCURSOR AS
+    v_cursor SYS_REFCURSOR; -- Declare a cursor to hold the query result
+BEGIN
+    -- Open the cursor for the top 5 pending expenses by amount
+    OPEN v_cursor FOR
+        SELECT ExpenseID, EmployeeID, Amount, Description
+        FROM Expense
+        WHERE StatusID = 1 -- Pending status
+        ORDER BY Amount DESC
+        FETCH FIRST 5 ROWS ONLY;
+
+    -- Return the cursor
+    RETURN v_cursor;
+END get_top_5_pending_expenses;
+/
+
+DECLARE
+    v_cursor SYS_REFCURSOR;         -- Cursor to hold the result from the function
+    v_expense_id NUMBER;            -- Variable to hold the Expense ID
+    v_employee_id NUMBER;           -- Variable to hold the Employee ID
+    v_amount NUMBER;                -- Variable to hold the Amount
+    v_description VARCHAR2(200);    -- Variable to hold the Description
+BEGIN
+    -- Call the function to get the top 5 pending expenses by amount
+    v_cursor := get_top_5_pending_expenses;
+
+    -- Display report header
+    DBMS_OUTPUT.PUT_LINE('Top 5 Pending Expenses by Amount:');
+
+    -- Fetch and display each record
+    LOOP
+        FETCH v_cursor INTO v_expense_id, v_employee_id, v_amount, v_description;
+        EXIT WHEN v_cursor%NOTFOUND; -- Exit loop when all rows are processed
+
+        -- Print each expense's details
+        DBMS_OUTPUT.PUT_LINE('Expense ID: ' || v_expense_id || 
+                             ', Employee ID: ' || v_employee_id || 
+                             ', Amount: $' || v_amount || 
+                             ', Description: ' || v_description);
+    END LOOP;
+
+    -- Close the cursor
+    CLOSE v_cursor;
+END;
+/
 
