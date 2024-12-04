@@ -486,6 +486,41 @@ EXCEPTION
 END;
 /
 
+-- Drop Trigger trg_flag_expense if it exists
+BEGIN
+    EXECUTE IMMEDIATE 'DROP TRIGGER trg_flag_expense';
+EXCEPTION
+    WHEN OTHERS THEN
+        NULL;
+END;
+/
+
+-- Drop Trigger trg_department_delete if it exists
+BEGIN
+    EXECUTE IMMEDIATE 'DROP TRIGGER trg_department_delete';
+EXCEPTION
+    WHEN OTHERS THEN
+        NULL;
+END;
+/
+
+-- Drop Trigger trg_prevent_self_approval if it exists
+BEGIN
+    EXECUTE IMMEDIATE 'DROP TRIGGER trg_prevent_self_approval';
+EXCEPTION
+    WHEN OTHERS THEN
+        NULL;
+END;
+/
+
+-- Drop Trigger trg_unique_expense_type if it exists
+BEGIN
+    EXECUTE IMMEDIATE 'DROP TRIGGER trg_unique_expense_type';
+EXCEPTION
+    WHEN OTHERS THEN
+        NULL;
+END;
+/
 
 
 ---------------------------Triggers Creation---------------------------------------------
@@ -596,4 +631,363 @@ BEGIN
     END IF;
 END;
 /
+
+
+--5. Expense Flagging for Review
+
+CREATE OR REPLACE TRIGGER trg_flag_high_value_expense
+AFTER INSERT OR UPDATE ON Expense
+FOR EACH ROW
+BEGIN
+    -- Check if the Amount exceeds 2500
+    IF :NEW.Amount > 2500 THEN
+        INSERT INTO AuditLog (
+            ExpenseID,
+            ModifiedBy,
+            ModificationDate,
+            ActionTaken
+        )
+        VALUES (
+            :NEW.ExpenseID,
+            'System', -- or use an appropriate admin/employee ID if available
+            SYSDATE,
+            'High-value expense flagged for review'
+        );
+    END IF;
+END;
+/
+
+
+--6. Enforce Valid Department Assignment
+CREATE OR REPLACE TRIGGER trg_department_delete
+FOR DELETE ON Department
+COMPOUND TRIGGER
+
+    -- Declare a collection to hold the DepartmentIDs being deleted
+    TYPE DeptIDTable IS TABLE OF Department.DepartmentID%TYPE;
+    dept_ids DeptIDTable := DeptIDTable();
+
+    BEFORE EACH ROW IS
+    BEGIN
+        -- Add the DepartmentID being deleted to the collection
+        dept_ids.EXTEND;
+        dept_ids(dept_ids.LAST) := :OLD.DepartmentID;
+    END BEFORE EACH ROW;
+
+    AFTER STATEMENT IS
+    BEGIN
+        -- Process the DepartmentIDs collected in the BEFORE EACH ROW phase
+        FOR i IN 1 .. dept_ids.COUNT LOOP
+            -- Set the DepartmentID to NULL in Employee table
+            UPDATE Employee
+            SET DepartmentID = NULL
+            WHERE DepartmentID = dept_ids(i);
+        END LOOP;
+    END AFTER STATEMENT;
+
+END trg_department_delete;
+/
+
+
+
+
+
+
+--7. Prevent Self-Approval of Expenses
+
+CREATE OR REPLACE TRIGGER trg_prevent_self_approval
+BEFORE INSERT OR UPDATE ON Approval
+FOR EACH ROW
+DECLARE
+    v_EmployeeID NUMBER; -- Variable to store the EmployeeID associated with the Expense
+BEGIN
+    -- Check if the ExpenseID exists
+    SELECT EmployeeID
+    INTO v_EmployeeID
+    FROM Expense
+    WHERE ExpenseID = :NEW.ExpenseID;
+
+    -- Check if the AdminID matches the EmployeeID
+    IF :NEW.AdminID = v_EmployeeID THEN
+        RAISE_APPLICATION_ERROR(-20003, 'Employees cannot approve their own expenses.');
+    END IF;
+EXCEPTION
+    WHEN NO_DATA_FOUND THEN
+        RAISE_APPLICATION_ERROR(-20004, 'Invalid ExpenseID: The specified ExpenseID does not exist.');
+END;
+/
+
+
+--8. Ensure Unique Expense Types
+
+CREATE OR REPLACE TRIGGER trg_unique_expense_type
+BEFORE INSERT OR UPDATE ON ExpenseType
+FOR EACH ROW
+DECLARE
+    v_Count NUMBER; -- Variable to hold the count of matching rows
+BEGIN
+    -- Check if a record with the same TypeName exists but with a different ExpenseTypeID
+    SELECT COUNT(*)
+    INTO v_Count
+    FROM ExpenseType
+    WHERE TypeName = :NEW.TypeName
+      AND ExpenseTypeID != NVL(:NEW.ExpenseTypeID, -1); -- Handle null ExpenseTypeID during INSERT
+
+    -- If a duplicate exists, raise an error
+    IF v_Count > 0 THEN
+        RAISE_APPLICATION_ERROR(-20004, 'Expense type must be unique.');
+    END IF;
+END;
+/
+
+----------Packages,Procedures,Functions-------------
+--1. NotificationManagement Package
+--Specification
+CREATE OR REPLACE PACKAGE NotificationManagement IS
+    -- Functions
+    FUNCTION GetUnreadNotificationsCount(p_EmployeeID NUMBER) RETURN NUMBER;
+    FUNCTION GetNotificationDetails(p_NotificationID NUMBER) RETURN VARCHAR2;
+
+    -- Procedures
+    PROCEDURE CreateNotification(p_NotificationID NUMBER, p_EmployeeID NUMBER, p_AdminID NUMBER, p_Message VARCHAR2);
+    PROCEDURE MarkNotificationAsRead(p_NotificationID NUMBER);
+END NotificationManagement;
+/
+
+---Body
+CREATE OR REPLACE PACKAGE BODY NotificationManagement IS
+    -- Function to get unread notifications count for an employee
+    FUNCTION GetUnreadNotificationsCount(p_EmployeeID NUMBER) RETURN NUMBER IS
+        v_Count NUMBER;
+    BEGIN
+        -- Query to count unread notifications for the given Employee ID
+        SELECT COUNT(*)
+        INTO v_Count
+        FROM Notifications
+        WHERE EmployeeID = p_EmployeeID AND IsRead = 'N';
+
+        RETURN v_Count;
+    EXCEPTION
+        WHEN NO_DATA_FOUND THEN
+            RETURN 0; -- Return 0 if no unread notifications are found
+    END;
+
+    -- Function to get notification details
+    FUNCTION GetNotificationDetails(p_NotificationID NUMBER) RETURN VARCHAR2 IS
+        v_Details VARCHAR2(255);
+    BEGIN
+        -- Query to fetch notification details for the given Notification ID
+        SELECT Message || ', Date: ' || TO_CHAR(NotificationDate, 'YYYY-MM-DD')
+        INTO v_Details
+        FROM Notifications
+        WHERE NotificationID = p_NotificationID;
+
+        RETURN v_Details;
+    EXCEPTION
+        WHEN NO_DATA_FOUND THEN
+            RETURN 'Notification Not Found'; -- Return default message if ID is not found
+    END;
+
+    -- Procedure to create a notification with manually provided NotificationID
+    PROCEDURE CreateNotification(
+        p_NotificationID NUMBER,
+        p_EmployeeID NUMBER,
+        p_AdminID NUMBER,
+        p_Message VARCHAR2
+    ) IS
+    BEGIN
+        -- Insert new notification into the Notifications table
+        INSERT INTO Notifications (
+            NotificationID,
+            EmployeeID,
+            AdminID,
+            Message,
+            NotificationDate,
+            IsRead
+        )
+        VALUES (
+            p_NotificationID,
+            p_EmployeeID,
+            p_AdminID,
+            p_Message,
+            SYSDATE,
+            'N'
+        );
+
+        -- Output success message
+        DBMS_OUTPUT.PUT_LINE('Notification Created Successfully with ID ' || p_NotificationID);
+    EXCEPTION
+        WHEN OTHERS THEN
+            DBMS_OUTPUT.PUT_LINE('Error: Unable to create notification. ' || SQLERRM);
+    END;
+
+    -- Procedure to mark a notification as read
+    PROCEDURE MarkNotificationAsRead(p_NotificationID NUMBER) IS
+    BEGIN
+        -- Update IsRead status to 'Y' for the given Notification ID
+        UPDATE Notifications
+        SET IsRead = 'Y'
+        WHERE NotificationID = p_NotificationID;
+
+        IF SQL%ROWCOUNT = 0 THEN
+            -- Output message if no rows were updated
+            DBMS_OUTPUT.PUT_LINE('Notification ID ' || p_NotificationID || ' not found.');
+        ELSE
+            -- Output success message
+            DBMS_OUTPUT.PUT_LINE('Notification Marked as Read for ID ' || p_NotificationID);
+        END IF;
+    EXCEPTION
+        WHEN OTHERS THEN
+            DBMS_OUTPUT.PUT_LINE('Error: Unable to mark notification as read. ' || SQLERRM);
+    END;
+
+END NotificationManagement;
+/
+
+
+--------------usage---
+--1.Create a Notification
+BEGIN
+    NotificationManagement.CreateNotification(
+        p_NotificationID => 201,  -- Manually assigned Notification ID
+        p_EmployeeID => 1,       -- Employee ID
+        p_AdminID => 2,          -- Admin ID
+        p_Message => 'Your expense has been approved and is ready for review.'
+    );
+    ROLLBACK;
+END;
+/
+
+
+----delete--
+DELETE FROM Notifications
+WHERE NotificationID = 201;
+
+-----2. Mark a Notification as Read
+
+BEGIN
+    NotificationManagement.MarkNotificationAsRead(p_NotificationID => 201);
+    ROLLBACK;
+END;
+/
+
+----3. Fetch Count of Unread Notifications
+
+SELECT NotificationManagement.GetUnreadNotificationsCount(1) AS UnreadCount FROM DUAL;
+
+
+
+----4. Get Notification Details
+
+SELECT NotificationManagement.GetNotificationDetails(201) AS NotificationDetails FROM DUAL;
+
+---2. AuditLogManagement Package
+--Package Specification
+CREATE OR REPLACE PACKAGE AuditLogManagement IS
+    -- Functions
+    FUNCTION GetAuditLogByExpense(p_ExpenseID NUMBER) RETURN SYS_REFCURSOR;
+    FUNCTION GetAuditCountByAdmin(p_AdminID NUMBER) RETURN NUMBER;
+
+    -- Procedures
+    PROCEDURE AddAuditLog(p_ExpenseID NUMBER, p_AdminID NUMBER, p_ActionTaken VARCHAR2);
+    PROCEDURE ClearAuditLogsOlderThan(p_Days NUMBER);
+END AuditLogManagement;
+/
+
+---Body
+CREATE OR REPLACE PACKAGE BODY AuditLogManagement IS
+    -- Function to get audit logs for a specific expense
+    FUNCTION GetAuditLogByExpense(p_ExpenseID NUMBER) RETURN SYS_REFCURSOR IS
+        v_Cursor SYS_REFCURSOR;
+    BEGIN
+        OPEN v_Cursor FOR
+            SELECT AuditID, ExpenseID, AdminID, ActionTaken, ModificationDate
+            FROM AuditLog
+            WHERE ExpenseID = p_ExpenseID;
+
+        RETURN v_Cursor;
+    END;
+
+    -- Function to count audit logs created by a specific admin
+    FUNCTION GetAuditCountByAdmin(p_AdminID NUMBER) RETURN NUMBER IS
+        v_Count NUMBER;
+    BEGIN
+        SELECT COUNT(*)
+        INTO v_Count
+        FROM AuditLog
+        WHERE AdminID = p_AdminID;
+
+        RETURN v_Count;
+    EXCEPTION
+        WHEN NO_DATA_FOUND THEN
+            RETURN 0;
+    END;
+
+    -- Procedure to add an audit log
+    PROCEDURE AddAuditLog(p_ExpenseID NUMBER, p_AdminID NUMBER, p_ActionTaken VARCHAR2) IS
+    BEGIN
+        INSERT INTO AuditLog (AuditID, ExpenseID, AdminID, ModifiedBy, ModificationDate, ActionTaken)
+        VALUES (AuditLog_SEQ.NEXTVAL, p_ExpenseID, p_AdminID, 'System', SYSDATE, p_ActionTaken);
+
+        DBMS_OUTPUT.PUT_LINE('Audit Log Added for ExpenseID: ' || p_ExpenseID);
+    END;
+
+    -- Procedure to clear audit logs older than a specified number of days
+    PROCEDURE ClearAuditLogsOlderThan(p_Days NUMBER) IS
+    BEGIN
+        DELETE FROM AuditLog
+        WHERE ModificationDate < SYSDATE - p_Days;
+
+        DBMS_OUTPUT.PUT_LINE('Audit Logs Older Than ' || p_Days || ' Days Deleted');
+    END;
+
+END AuditLogManagement;
+/
+
+---Usage
+-- Fetch audit logs for a specific expense
+-- Declare a variable to hold the result (REFCURSOR)
+VARIABLE v_cursor REFCURSOR;
+
+-- Call the function to fetch audit logs for ExpenseID = 1
+BEGIN
+    :v_cursor := AuditLogManagement.GetAuditLogByExpense(1);
+    ROLLBACK;
+END;
+/
+
+-- Print the contents of the REFCURSOR
+PRINT v_cursor;
+
+
+-- Count audit logs created by an admin
+SELECT AuditLogManagement.GetAuditCountByAdmin(1) AS AdminAuditCount FROM DUAL;
+
+-- Add a new audit log
+BEGIN
+    AuditLogManagement.AddAuditLog(
+        p_ExpenseID => 1,    -- The Expense ID for which the log is being created
+        p_AdminID => 2,      -- Admin ID creating the log
+        p_ActionTaken => 'Expense Approved' -- Description of the action taken
+    );
+    ROLLBACK;
+END;
+/
+
+SELECT * FROM AuditLog;
+
+DELETE FROM AuditLog
+WHERE ExpenseID = 1
+  AND AdminID = 2
+  AND ActionTaken = 'Expense Approved';
+
+-- Commit the transaction to save the changes
+COMMIT;
+
+
+-- Clear audit logs older than 30 days
+BEGIN
+    AuditLogManagement.ClearAuditLogsOlderThan(30);
+    ROLLBACK;
+END;
 
