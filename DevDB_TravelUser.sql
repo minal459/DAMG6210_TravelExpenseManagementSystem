@@ -987,4 +987,42 @@ CREATE OR REPLACE PACKAGE BODY AuditLogManagement IS
 END AuditLogManagement;
 /
 
+-----------------------------------------------Employee Policy------------------------------
+CREATE OR REPLACE FUNCTION Restricted_Expense_Policy (
+    schema_name IN VARCHAR2,
+    table_name IN VARCHAR2
+)
+RETURN VARCHAR2
+AS
+    employee_id VARCHAR2(100);
+BEGIN
+    -- Check the current session user
+    IF SYS_CONTEXT('USERENV', 'SESSION_USER') = 'DATAVIEWERUSER' THEN
+        -- Restrict DataViewerUser to a specific employee's data
+        employee_id := '1'; -- Replace with the specific employee_id for DataViewerUser
+        RETURN 'EMPLOYEEID = ''' || employee_id || '''';
+    ELSIF SYS_CONTEXT('USERENV', 'SESSION_USER') = 'TRAVELUSER' THEN
+        -- TravelUser has access to all rows
+        RETURN NULL;
+    ELSE
+        -- Deny access for all other users
+        RETURN '1=2';
+    END IF;
+END;
+/
+
+
+BEGIN
+    DBMS_RLS.ADD_POLICY(
+        object_schema   => 'TravelUser',
+        object_name     => 'Expense',
+        policy_name     => 'Restricted_Expense_Access',
+        function_schema => 'TravelUser', -- Schema where the function resides
+        policy_function => 'Restricted_Expense_Policy',
+        statement_types => 'SELECT, UPDATE'
+    );
+END;
+/
+
+
 
