@@ -1,17 +1,101 @@
--- Drop existing tables to avoid conflicts during creation
-DROP TABLE Department CASCADE CONSTRAINTS;
-DROP TABLE Employee CASCADE CONSTRAINTS;
-DROP TABLE FinancialAuditor CASCADE CONSTRAINTS;
-DROP TABLE ExpenseStatus CASCADE CONSTRAINTS;
-DROP TABLE ExpenseType CASCADE CONSTRAINTS;
-DROP TABLE Administrator CASCADE CONSTRAINTS;
-DROP TABLE Expense CASCADE CONSTRAINTS;
-DROP TABLE Approval CASCADE CONSTRAINTS;
-DROP TABLE AuditLog CASCADE CONSTRAINTS;
-DROP TABLE Notifications CASCADE CONSTRAINTS;
-DROP TABLE Reimbursement CASCADE CONSTRAINTS;
-DROP TABLE Payment CASCADE CONSTRAINTS;
+-- Drop Department table if it exists
+BEGIN
+    EXECUTE IMMEDIATE 'DROP TABLE Department CASCADE CONSTRAINTS';
+EXCEPTION
+    WHEN OTHERS THEN
+        NULL; -- Ignore errors if table does not exist
+END;
+/
 
+-- Drop Employee table if it exists
+BEGIN
+    EXECUTE IMMEDIATE 'DROP TABLE Employee CASCADE CONSTRAINTS';
+EXCEPTION
+    WHEN OTHERS THEN
+        NULL;
+END;
+/
+
+-- Repeat for other tables
+BEGIN
+    EXECUTE IMMEDIATE 'DROP TABLE FinancialAuditor CASCADE CONSTRAINTS';
+EXCEPTION
+    WHEN OTHERS THEN
+        NULL;
+END;
+/
+
+BEGIN
+    EXECUTE IMMEDIATE 'DROP TABLE ExpenseStatus CASCADE CONSTRAINTS';
+EXCEPTION
+    WHEN OTHERS THEN
+        NULL;
+END;
+/
+
+BEGIN
+    EXECUTE IMMEDIATE 'DROP TABLE ExpenseType CASCADE CONSTRAINTS';
+EXCEPTION
+    WHEN OTHERS THEN
+        NULL;
+END;
+/
+
+BEGIN
+    EXECUTE IMMEDIATE 'DROP TABLE Administrator CASCADE CONSTRAINTS';
+EXCEPTION
+    WHEN OTHERS THEN
+        NULL;
+END;
+/
+
+BEGIN
+    EXECUTE IMMEDIATE 'DROP TABLE Expense CASCADE CONSTRAINTS';
+EXCEPTION
+    WHEN OTHERS THEN
+        NULL;
+END;
+/
+
+BEGIN
+    EXECUTE IMMEDIATE 'DROP TABLE Approval CASCADE CONSTRAINTS';
+EXCEPTION
+    WHEN OTHERS THEN
+        NULL;
+END;
+/
+
+BEGIN
+    EXECUTE IMMEDIATE 'DROP TABLE AuditLog CASCADE CONSTRAINTS';
+EXCEPTION
+    WHEN OTHERS THEN
+        NULL;
+END;
+/
+
+BEGIN
+    EXECUTE IMMEDIATE 'DROP TABLE Notifications CASCADE CONSTRAINTS';
+EXCEPTION
+    WHEN OTHERS THEN
+        NULL;
+END;
+/
+
+BEGIN
+    EXECUTE IMMEDIATE 'DROP TABLE Reimbursement CASCADE CONSTRAINTS';
+EXCEPTION
+    WHEN OTHERS THEN
+        NULL;
+END;
+/
+
+BEGIN
+    EXECUTE IMMEDIATE 'DROP TABLE Payment CASCADE CONSTRAINTS';
+EXCEPTION
+    WHEN OTHERS THEN
+        NULL;
+END;
+/
 
 
 
@@ -72,7 +156,7 @@ CREATE TABLE Expense (
     EmployeeID NUMBER,  -- Foreign Key to Employee
     ExpenseTypeID NUMBER,  -- Foreign Key to ExpenseType
     AdminID NUMBER,  -- Link to Admin table for admin submitting/managing the expense
-    Amount NUMBER(7, 2) NOT NULL CHECK (Amount > 0 AND Amount <= 5000),  -- Positive amount <= 5000
+    Amount NUMBER(7, 2) NOT NULL CHECK (Amount >= 0 AND Amount <= 5000),  -- Positive amount <= 5000
     ExpenseDate DATE NOT NULL,  -- ExpenseDate should be on or before today
     Description VARCHAR2(255),
     StatusID NUMBER,  -- Foreign Key to ExpenseStatus
@@ -158,15 +242,60 @@ CREATE TABLE Payment (
 
 -----------------------------------------Views---------------------------------------------------------------------------------------
 
+-- Drop HighValueExpenses view if it exists
+BEGIN
+    EXECUTE IMMEDIATE 'DROP VIEW HighValueExpenses';
+EXCEPTION
+    WHEN OTHERS THEN
+        NULL; -- Ignore errors if the view does not exist
+END;
+/
 
-DROP VIEW HighValueExpenses;
-DROP VIEW ExpenseSummaryByEmployee;
-DROP VIEW PendingApprovals;
-DROP VIEW ExpensesByStatus;
-DROP VIEW TotalExpensesByType;
-DROP VIEW ApprovedExpensesOverTime;
-DROP VIEW AdministratorActivityLog;
-DROP VIEW ReimbursementDetails;
+-- Drop ExpenseSummaryByEmployee view if it exists
+BEGIN
+    EXECUTE IMMEDIATE 'DROP VIEW ExpenseSummaryByEmployee';
+EXCEPTION
+    WHEN OTHERS THEN
+        NULL;
+END;
+/
+
+-- Drop PendingApprovals view if it exists
+BEGIN
+    EXECUTE IMMEDIATE 'DROP VIEW PendingApprovals';
+EXCEPTION
+    WHEN OTHERS THEN
+        NULL;
+END;
+/
+
+-- Drop ExpensesByStatus view if it exists
+BEGIN
+    EXECUTE IMMEDIATE 'DROP VIEW ExpensesByStatus';
+EXCEPTION
+    WHEN OTHERS THEN
+        NULL;
+END;
+/
+
+-- Drop TotalExpensesByType view if it exists
+BEGIN
+    EXECUTE IMMEDIATE 'DROP VIEW TotalExpensesByType';
+EXCEPTION
+    WHEN OTHERS THEN
+        NULL;
+END;
+/
+
+-- Drop ApprovedExpensesOverTime view if it exists
+BEGIN
+    EXECUTE IMMEDIATE 'DROP VIEW ApprovedExpensesOverTime';
+EXCEPTION
+    WHEN OTHERS THEN
+        NULL;
+END;
+/
+
 
 -- 1. View: High-Value Expenses
 CREATE OR REPLACE VIEW HighValueExpenses AS
@@ -185,7 +314,7 @@ JOIN
 WHERE 
     e.Amount > 1000;
 
-SELECT * FROM HighValueExpenses;
+
 
 -- 2. View: Expense Summary by Employee
 CREATE OR REPLACE VIEW ExpenseSummaryByEmployee AS
@@ -203,6 +332,7 @@ JOIN
     ExpenseType et ON e.ExpenseTypeID = et.ExpenseTypeID
 GROUP BY 
     emp.EmployeeID, emp.FirstName, emp.LastName, et.TypeName;
+
 
 SELECT * FROM ExpenseSummaryByEmployee;
 
@@ -229,7 +359,7 @@ JOIN
 WHERE 
     a.StatusID = (SELECT StatusID FROM ExpenseStatus WHERE StatusName = 'Pending');
 
-SELECT * FROM PendingApprovals;
+
 -- 4. View: Expenses by Status
 CREATE OR REPLACE VIEW ExpensesByStatus AS
 SELECT 
@@ -316,164 +446,440 @@ JOIN
     Payment p ON r.ReimbursementID = p.ReimbursementID;
     
 
--------------------Insert--------------------------
-INSERT INTO Department (DepartmentID, DepartmentName, Location) VALUES 
-    (1, 'Finance', 'New York'),
-    (2, 'IT', 'San Francisco'),
-    (3, 'HR', 'Chicago'),
-    (4, 'Marketing', 'Boston'),
-    (5, 'Operations', 'Austin'),
-    (6, 'Sales', 'Seattle'),
-    (7, 'Customer Support', 'Orlando'),
-    (8, 'Legal', 'Washington'),
-    (9, 'RD', 'San Jose'),
-    (10, 'Logistics', 'Dallas');
+
+
+---------------------Triggers -------------------------------
+
+-- Drop Trigger trg_expense_update if it exists
+BEGIN
+    EXECUTE IMMEDIATE 'DROP TRIGGER trg_expense_update';
+EXCEPTION
+    WHEN OTHERS THEN
+        NULL; -- Ignore errors if the trigger does not exist
+END;
+/
+
+-- Drop Trigger trg_status_change if it exists
+BEGIN
+    EXECUTE IMMEDIATE 'DROP TRIGGER trg_status_change';
+EXCEPTION
+    WHEN OTHERS THEN
+        NULL;
+END;
+/
+
+-- Drop Trigger trg_prevent_future_date if it exists
+BEGIN
+    EXECUTE IMMEDIATE 'DROP TRIGGER trg_prevent_future_date';
+EXCEPTION
+    WHEN OTHERS THEN
+        NULL;
+END;
+/
+
+-- Drop Trigger trg_reimbursement_amount if it exists
+BEGIN
+    EXECUTE IMMEDIATE 'DROP TRIGGER trg_reimbursement_amount';
+EXCEPTION
+    WHEN OTHERS THEN
+        NULL;
+END;
+/
+
+-- Drop Trigger trg_flag_expense if it exists
+BEGIN
+    EXECUTE IMMEDIATE 'DROP TRIGGER trg_flag_expense';
+EXCEPTION
+    WHEN OTHERS THEN
+        NULL;
+END;
+/
+
+-- Drop Trigger trg_department_delete if it exists
+BEGIN
+    EXECUTE IMMEDIATE 'DROP TRIGGER trg_department_delete';
+EXCEPTION
+    WHEN OTHERS THEN
+        NULL;
+END;
+/
+
+-- Drop Trigger trg_prevent_self_approval if it exists
+BEGIN
+    EXECUTE IMMEDIATE 'DROP TRIGGER trg_prevent_self_approval';
+EXCEPTION
+    WHEN OTHERS THEN
+        NULL;
+END;
+/
+
+-- Drop Trigger trg_unique_expense_type if it exists
+BEGIN
+    EXECUTE IMMEDIATE 'DROP TRIGGER trg_unique_expense_type';
+EXCEPTION
+    WHEN OTHERS THEN
+        NULL;
+END;
+/
+
+
+---------------------------Triggers Creation---------------------------------------------
+--1. Auto-Insertion of Audit Logs on Expense Modifications
+
+CREATE OR REPLACE TRIGGER trg_expense_update
+AFTER UPDATE ON Expense
+FOR EACH ROW
+BEGIN
+    -- Check if the Amount has been updated
+    IF :OLD.Amount != :NEW.Amount THEN
+        -- Attempt to update the corresponding record in the AuditLog table
+        UPDATE AuditLog
+        SET ModificationDate = SYSDATE,
+            ModifiedBy = 'System',
+            ActionTaken = 'Amount Updated'
+        WHERE ExpenseID = :OLD.ExpenseID;
+
+        -- Raise an error if no rows were updated
+        IF SQL%ROWCOUNT = 0 THEN
+            RAISE_APPLICATION_ERROR(-20001, 'No matching row exists in AuditLog for ExpenseID ' || :OLD.ExpenseID);
+        END IF;
+
+    -- Check if the StatusID has been updated
+    ELSIF :OLD.StatusID != :NEW.StatusID THEN
+        -- Attempt to update the corresponding record in the AuditLog table
+        UPDATE AuditLog
+        SET ModificationDate = SYSDATE,
+            ModifiedBy = 'System',
+            ActionTaken = 'Status Updated'
+        WHERE ExpenseID = :OLD.ExpenseID;
+
+        -- Raise an error if no rows were updated
+        IF SQL%ROWCOUNT = 0 THEN
+            RAISE_APPLICATION_ERROR(-20001, 'No matching row exists in AuditLog for ExpenseID ' || :OLD.ExpenseID);
+        END IF;
+
+    -- Handle other updates
+    ELSE
+        -- Attempt to update the corresponding record in the AuditLog table
+        UPDATE AuditLog
+        SET ModificationDate = SYSDATE,
+            ModifiedBy = 'System',
+            ActionTaken = 'Other Update'
+        WHERE ExpenseID = :OLD.ExpenseID;
+
+        -- Raise an error if no rows were updated
+        IF SQL%ROWCOUNT = 0 THEN
+            RAISE_APPLICATION_ERROR(-20001, 'No matching row exists in AuditLog for ExpenseID ' || :OLD.ExpenseID);
+        END IF;
+    END IF;
+END;
+/
+
+--2. Audit Trail for Expense Status Changes
+
+
+CREATE OR REPLACE TRIGGER trg_status_change
+AFTER UPDATE ON Expense
+FOR EACH ROW
+BEGIN
+    IF :OLD.StatusID != :NEW.StatusID THEN
+        -- Attempt to update the existing row in AuditLog
+        UPDATE AuditLog
+        SET ModifiedBy = 'System',
+            ModificationDate = SYSDATE,
+            ActionTaken = 'Status Changed'
+        WHERE ExpenseID = :OLD.ExpenseID;
+
+        -- Optionally raise an error if no rows were updated
+        IF SQL%ROWCOUNT = 0 THEN
+            RAISE_APPLICATION_ERROR(-20002, 'No matching row exists in AuditLog for ExpenseID ' || :OLD.ExpenseID);
+        END IF;
+    END IF;
+END;
+/
 
 
 
-INSERT INTO Employee (EmployeeID, FirstName, LastName, DepartmentID, Email, Phone) VALUES 
-(1, 'John', 'Doe', 1, 'john.doe@example.com', '1234567890'),
-(2, 'Jane', 'Smith', 2, 'jane.smith@example.com', '0987654321'),
-(3, 'Alice', 'Brown', 3, 'alice.brown@example.com', '1112223333'),
-(4, 'Bob', 'White', 4, 'bob.white@example.com', '2223334444'),
-(5, 'Carol', 'Black', 5, 'carol.black@example.com', '3334445555'),
-(6, 'David', 'Green', 6, 'david.green@example.com', '4445556666'),
-(7, 'Eve', 'Blue', 7, 'eve.blue@example.com', '5556667777'),
-(8, 'Frank', 'Yellow', 8, 'frank.yellow@example.com', '6667778888'),
-(9, 'Grace', 'Pink', 9, 'grace.pink@example.com', '7778889999'),
-(10, 'Hank', 'Gray', 10, 'hank.gray@example.com', '8889990000');
+--3. Prevent Future Expense Dates
+
+CREATE OR REPLACE TRIGGER trg_prevent_future_date
+BEFORE INSERT OR UPDATE ON Expense
+FOR EACH ROW
+BEGIN
+    IF :NEW.ExpenseDate > SYSDATE THEN
+        RAISE_APPLICATION_ERROR(-20001, 'ExpenseDate cannot be in the future.');
+    END IF;
+END;
+/
+
+--4. Reimbursement Amount Validation
+CREATE OR REPLACE TRIGGER trg_reimbursement_amount
+BEFORE INSERT OR UPDATE ON Reimbursement
+FOR EACH ROW
+DECLARE
+    v_ExpenseAmount NUMBER; -- Variable to hold the Expense amount
+BEGIN
+    -- Fetch the Expense Amount from the Expense table
+    SELECT Amount
+    INTO v_ExpenseAmount
+    FROM Expense
+    WHERE ExpenseID = :NEW.ExpenseID;
+
+    -- Compare Reimbursement Amount with Expense Amount
+    IF :NEW.Amount > v_ExpenseAmount THEN
+        RAISE_APPLICATION_ERROR(-20002, 'Reimbursement amount cannot exceed original expense amount.');
+    END IF;
+END;
+/
 
 
+--5. Expense Flagging for Review
 
-INSERT INTO FinancialAuditor (AuditorID, FirstName, LastName, Email, Phone) VALUES 
-(1, 'Lily', 'Evans', 'lily.evans@example.com', '1112223333'),
-(2, 'James', 'Potter', 'james.potter@example.com', '2223334444'),
-(3, 'Albus', 'Dumbledore', 'albus.d@example.com', '3334445555'),
-(4, 'Minerva', 'McGonagall', 'minerva.m@example.com', '4445556666'),
-(5, 'Severus', 'Snape', 'severus.s@example.com', '5556667777'),
-(6, 'Sirius', 'Black', 'sirius.b@example.com', '6667778888'),
-(7, 'Remus', 'Lupin', 'remus.l@example.com', '7778889999'),
-(8, 'Horace', 'Slughorn', 'horace.s@example.com', '8889990000'),
-(9, 'Gilderoy', 'Lockhart', 'gilderoy.l@example.com', '9990001111'),
-(10, 'Rubeus', 'Hagrid', 'rubeus.h@example.com', '0001112222');
-
-
-
-
--- Insert valid status types into ExpenseStatus
-INSERT INTO ExpenseStatus (StatusID, StatusName) VALUES (1, 'Pending');
-INSERT INTO ExpenseStatus (StatusID, StatusName) VALUES (2, 'Approved');
-INSERT INTO ExpenseStatus (StatusID, StatusName) VALUES (3, 'Rejected');
-
-
-
--- Insert valid expense types into ExpenseType
-INSERT INTO ExpenseType (ExpenseTypeID, TypeName) VALUES (1, 'Meals');
-INSERT INTO ExpenseType (ExpenseTypeID, TypeName) VALUES (2, 'Travel');
-INSERT INTO ExpenseType (ExpenseTypeID, TypeName) VALUES (3, 'Accommodation');
+CREATE OR REPLACE TRIGGER trg_flag_high_value_expense
+AFTER INSERT OR UPDATE ON Expense
+FOR EACH ROW
+BEGIN
+    -- Check if the Amount exceeds 2500
+    IF :NEW.Amount > 2500 THEN
+        INSERT INTO AuditLog (
+            ExpenseID,
+            ModifiedBy,
+            ModificationDate,
+            ActionTaken
+        )
+        VALUES (
+            :NEW.ExpenseID,
+            'System', -- or use an appropriate admin/employee ID if available
+            SYSDATE,
+            'High-value expense flagged for review'
+        );
+    END IF;
+END;
+/
 
 
+--6. Enforce Valid Department Assignment
+CREATE OR REPLACE TRIGGER trg_department_delete
+FOR DELETE ON Department
+COMPOUND TRIGGER
 
+    -- Declare a collection to hold the DepartmentIDs being deleted
+    TYPE DeptIDTable IS TABLE OF Department.DepartmentID%TYPE;
+    dept_ids DeptIDTable := DeptIDTable();
 
-INSERT INTO Administrator (AdminID, AdminName, Role, Email) VALUES 
-(1, 'Admin1', 'Admin', 'admin1@example.com'),
-(2, 'Admin2', 'Viewer', 'admin2@example.com'),
-(3, 'Admin3', 'Deleter', 'admin3@example.com'),
-(4, 'Admin4', 'Admin', 'admin4@example.com'),
-(5, 'Admin5', 'Viewer', 'admin5@example.com'),
-(6, 'Admin6', 'Deleter', 'admin6@example.com'),
-(7, 'Admin7', 'Admin', 'admin7@example.com'),
-(8, 'Admin8', 'Viewer', 'admin8@example.com'),
-(9, 'Admin9', 'Deleter', 'admin9@example.com'),
-(10, 'Admin10', 'Admin', 'admin10@example.com');
+    BEFORE EACH ROW IS
+    BEGIN
+        -- Add the DepartmentID being deleted to the collection
+        dept_ids.EXTEND;
+        dept_ids(dept_ids.LAST) := :OLD.DepartmentID;
+    END BEFORE EACH ROW;
 
-INSERT INTO Expense (ExpenseID, EmployeeID, ExpenseTypeID, AdminID, Amount, ExpenseDate, Description, StatusID) VALUES 
-(1, 1, 1, 1, 150.00, TO_DATE('2024-01-15', 'YYYY-MM-DD'), 'Lunch meeting with client', 1),
-(2, 2, 2, 2, 2500.00, TO_DATE('2024-02-10', 'YYYY-MM-DD'), 'Flight for conference', 2),
-(3, 3, 3, 1, 500.00, TO_DATE('2024-02-15', 'YYYY-MM-DD'), 'Hotel stay for training', 3),
-(4, 4, 1, 2, 75.00, TO_DATE('2024-03-05', 'YYYY-MM-DD'), 'Team dinner', 1),
-(5, 5, 2, 1, 300.00, TO_DATE('2024-03-20', 'YYYY-MM-DD'), 'Tickets for client event', 2),
-(6, 6, 2, 1, 1200.00, TO_DATE('2024-04-02', 'YYYY-MM-DD'), 'Travel for on-site meeting', 3),
-(7, 7, 1, 2, 90.00, TO_DATE('2024-04-12', 'YYYY-MM-DD'), 'Working lunch with partner', 1),
-(8, 8, 3, 1, 600.00, TO_DATE('2024-04-22', 'YYYY-MM-DD'), 'Accommodation for training', 2),
-(9, 9, 2, 2, 2750.00, TO_DATE('2024-05-05', 'YYYY-MM-DD'), 'International flight',3),
-(10, 10, 1, 1, 200.00, TO_DATE('2024-05-15', 'YYYY-MM-DD'), 'Client entertainment', 1);
+    AFTER STATEMENT IS
+    BEGIN
+        -- Process the DepartmentIDs collected in the BEFORE EACH ROW phase
+        FOR i IN 1 .. dept_ids.COUNT LOOP
+            -- Set the DepartmentID to NULL in Employee table
+            UPDATE Employee
+            SET DepartmentID = NULL
+            WHERE DepartmentID = dept_ids(i);
+        END LOOP;
+    END AFTER STATEMENT;
 
-
-
-INSERT INTO Approval (ApprovalID, ExpenseID, AuditorID, AdminID, StatusID, ApprovalDate, Comments) VALUES 
-(1, 1, 1, 1, 2, TO_DATE('2024-01-16', 'YYYY-MM-DD'), 'Approved by Auditor'),
-(2, 2, 2, 2, 2, TO_DATE('2024-02-11', 'YYYY-MM-DD'), 'Approved by Auditor'),
-(3, 3, 3, 1, 3, TO_DATE('2024-02-16', 'YYYY-MM-DD'), 'Rejected due to policy'),
-(4, 4, 4, 2, 1, TO_DATE('2024-03-06', 'YYYY-MM-DD'), 'Pending for more details'),
-(5, 5, 5, 1, 1, TO_DATE('2024-03-21', 'YYYY-MM-DD'), 'Pending for more details'),
-(6, 6, 6, 1, 3, TO_DATE('2024-04-03', 'YYYY-MM-DD'), 'Rejected due to policy'),
-(7, 7, 7, 2, 2, TO_DATE('2024-04-13', 'YYYY-MM-DD'), 'Approved by Auditor'),
-(8, 8, 8, 1, 1, TO_DATE('2024-04-23', 'YYYY-MM-DD'), 'Pending for more details'),
-(9, 9, 9, 2, 2, TO_DATE('2024-05-06', 'YYYY-MM-DD'), 'Approved by Auditor'),
-(10, 10, 10, 1, 1, TO_DATE('2024-05-16', 'YYYY-MM-DD'), 'Pending for more details');
-
-
-
-
-INSERT INTO AuditLog (AuditID, AuditorID, ExpenseID, AdminID, ModifiedBy, ModificationDate, ActionTaken) VALUES
-    (1, 1, 1, 1, 'Admin1', TO_DATE('2024-01-01', 'YYYY-MM-DD'), 'Created Expense'),
-    (2, 2, 2, 2, 'Admin2', TO_DATE('2024-01-02', 'YYYY-MM-DD'), 'Approved Expense'),
-    (3, 3, 3, 3, 'Admin3', TO_DATE('2024-01-03', 'YYYY-MM-DD'), 'Rejected Expense'),
-    (4, 4, 4, 4, 'Admin4', TO_DATE('2024-01-04', 'YYYY-MM-DD'), 'Modified Expense Details'),
-    (5, 5, 5, 5, 'Admin5', TO_DATE('2024-01-05', 'YYYY-MM-DD'), 'Processed Payment'),
-    (6, 6, 6, 6, 'Admin6', TO_DATE('2024-01-06', 'YYYY-MM-DD'), 'Submitted Reimbursement'),
-    (7, 7, 7, 7, 'Admin7', TO_DATE('2024-01-07', 'YYYY-MM-DD'), 'Manager Approval Pending'),
-    (8, 8, 8, 8, 'Admin8', TO_DATE('2024-01-08', 'YYYY-MM-DD'), 'Cancelled Expense'),
-    (9, 9, 9, 9, 'Admin9', TO_DATE('2024-01-09', 'YYYY-MM-DD'), 'Under Review'),
-    (10, 10, 10, 10, 'Admin10', TO_DATE('2024-01-10', 'YYYY-MM-DD'), 'Deferred Expense');
-    
-
-
-
--- Insert sample data into Notifications table
-INSERT INTO Notifications (NotificationID, EmployeeID, AdminID, Message, NotificationDate, IsRead, AuditID) VALUES 
-(1, 1, 1, 'Expense approval required', TO_DATE('2024-01-15', 'YYYY-MM-DD'), 'N', 1),
-(2, 2, 1, 'Expense processed successfully', TO_DATE('2024-02-11', 'YYYY-MM-DD'), 'Y', 2),
-(3, 3, 2, 'More details required for expense', TO_DATE('2024-02-16', 'YYYY-MM-DD'), 'N', 3),
-(4, 4, 2, 'Audit has been completed', TO_DATE('2024-03-06', 'YYYY-MM-DD'), 'Y', 4),
-(5, 5, 3, 'Payment processed', TO_DATE('2024-03-21', 'YYYY-MM-DD'), 'N', 5),
-(6, 6, 3, 'Reimbursement request submitted', TO_DATE('2024-04-03', 'YYYY-MM-DD'), 'Y', 6),
-(7, 7, 4, 'Awaiting manager approval', TO_DATE('2024-04-13', 'YYYY-MM-DD'), 'N', 7),
-(8, 8, 4, 'Expense cancelled by user', TO_DATE('2024-04-23', 'YYYY-MM-DD'), 'Y', 8),
-(9, 9, 5, 'Expense under review', TO_DATE('2024-05-06', 'YYYY-MM-DD'), 'N', 9),
-(10, 10, 5, 'Expense deferred until next month', TO_DATE('2024-05-16', 'YYYY-MM-DD'), 'N', 10);
+END trg_department_delete;
+/
 
 
 
 
 
-INSERT INTO Reimbursement (ReimbursementID, ExpenseID, Amount, Status) VALUES
-    (1, 1, 150.00, 'Pending'),
-    (2, 2, 2500.00, 'Approved'),
-    (3, 3, 500.00, 'Paid'),
-    (4, 4, 75.00, 'Pending'),
-    (5, 5, 300.00, 'Approved'),
-    (6, 6, 1200.00, 'Paid'),
-    (7, 7, 90.00, 'Pending'),
-    (8, 8, 600.00, 'Approved'),
-    (9, 9, 2750.00, 'Paid'),
-    (10, 10, 200.00, 'Pending');
+
+--7. Prevent Self-Approval of Expenses
+
+CREATE OR REPLACE TRIGGER trg_prevent_self_approval
+BEFORE INSERT OR UPDATE ON Approval
+FOR EACH ROW
+DECLARE
+    v_EmployeeID NUMBER; -- Variable to store the EmployeeID associated with the Expense
+BEGIN
+    -- Check if the ExpenseID exists
+    SELECT EmployeeID
+    INTO v_EmployeeID
+    FROM Expense
+    WHERE ExpenseID = :NEW.ExpenseID;
+
+    -- Check if the AdminID matches the EmployeeID
+    IF :NEW.AdminID = v_EmployeeID THEN
+        RAISE_APPLICATION_ERROR(-20003, 'Employees cannot approve their own expenses.');
+    END IF;
+EXCEPTION
+    WHEN NO_DATA_FOUND THEN
+        RAISE_APPLICATION_ERROR(-20004, 'Invalid ExpenseID: The specified ExpenseID does not exist.');
+END;
+/
+
+
+--8. Ensure Unique Expense Types
+
+CREATE OR REPLACE TRIGGER trg_unique_expense_type
+BEFORE INSERT OR UPDATE ON ExpenseType
+FOR EACH ROW
+DECLARE
+    v_Count NUMBER; -- Variable to hold the count of matching rows
+BEGIN
+    -- Check if a record with the same TypeName exists but with a different ExpenseTypeID
+    SELECT COUNT(*)
+    INTO v_Count
+    FROM ExpenseType
+    WHERE TypeName = :NEW.TypeName
+      AND ExpenseTypeID != NVL(:NEW.ExpenseTypeID, -1); -- Handle null ExpenseTypeID during INSERT
+
+    -- If a duplicate exists, raise an error
+    IF v_Count > 0 THEN
+        RAISE_APPLICATION_ERROR(-20004, 'Expense type must be unique.');
+    END IF;
+END;
+/
+
+
+---------------- Stored procedures, functions, packages --------------------------------------
+--Packages
+--Package Specification
+--1. ExpenseManagementPkg
+CREATE OR REPLACE PACKAGE ExpenseManagementPkg AS
+    PROCEDURE ApproveExpense(p_ExpenseID IN NUMBER, p_AdminID IN NUMBER);
+    PROCEDURE CalculateTotalExpenses(p_EmployeeID IN NUMBER, o_TotalAmount OUT NUMBER);
+    FUNCTION GetEmployeeEmail(p_EmployeeID IN NUMBER) RETURN VARCHAR2;
+    FUNCTION IsExpenseFlagged(p_ExpenseID IN NUMBER) RETURN BOOLEAN;
+END ExpenseManagementPkg;
+/
+
+--Package Body
+
+CREATE OR REPLACE PACKAGE BODY ExpenseManagementPkg AS
+
+    -- Procedure to approve an expense
+    PROCEDURE ApproveExpense(p_ExpenseID IN NUMBER, p_AdminID IN NUMBER) IS
+    BEGIN
+        -- Update the Expense table
+        UPDATE Expense
+        SET StatusID = (SELECT StatusID FROM ExpenseStatus WHERE StatusName = 'Approved'),
+            AdminID = p_AdminID
+        WHERE ExpenseID = p_ExpenseID;
+
+        -- Update the AuditLog table for the same ExpenseID
+        UPDATE AuditLog
+        SET ModifiedBy = 'Admin',
+            ModificationDate = SYSDATE,
+            ActionTaken = 'Expense Approved'
+        WHERE ExpenseID = p_ExpenseID;
+
+        -- Check if the update was successful
+        IF SQL%ROWCOUNT = 0 THEN
+            RAISE_APPLICATION_ERROR(-20001, 'No matching record found in AuditLog for ExpenseID: ' || p_ExpenseID);
+        END IF;
+    END ApproveExpense;
+
+    -- Procedure to calculate total expenses for an employee
+    PROCEDURE CalculateTotalExpenses(p_EmployeeID IN NUMBER, o_TotalAmount OUT NUMBER) IS
+    BEGIN
+        SELECT SUM(Amount)
+        INTO o_TotalAmount
+        FROM Expense
+        WHERE EmployeeID = p_EmployeeID;
+
+        IF o_TotalAmount IS NULL THEN
+            o_TotalAmount := 0;
+        END IF;
+    END CalculateTotalExpenses;
+
+    -- Function to get the email of an employee
+    FUNCTION GetEmployeeEmail(p_EmployeeID IN NUMBER) RETURN VARCHAR2 IS
+        v_Email VARCHAR2(100);
+    BEGIN
+        SELECT Email
+        INTO v_Email
+        FROM Employee
+        WHERE EmployeeID = p_EmployeeID;
+
+        RETURN v_Email;
+    END GetEmployeeEmail;
+
+    -- Function to check if an expense is flagged
+    FUNCTION IsExpenseFlagged(p_ExpenseID IN NUMBER) RETURN BOOLEAN IS
+        v_Flagged NUMBER; -- Variable to hold the flagged status (as NUMBER)
+    BEGIN
+        -- Check if the expense is flagged
+        SELECT CASE WHEN Amount > 2500 THEN 1 ELSE 0 END
+        INTO v_Flagged
+        FROM Expense
+        WHERE ExpenseID = p_ExpenseID;
+
+        -- Convert the NUMBER to BOOLEAN
+        RETURN v_Flagged = 1;
+    END IsExpenseFlagged;
+
+END ExpenseManagementPkg;
+/
+
+-------- Update amount to zero when status is approved-----------------
+CREATE OR REPLACE PROCEDURE sp_update_expense_details (
+    p_ExpenseID IN NUMBER
+)
+AS
+BEGIN
+    -- Update the Amount, ExpenseDate, and Description
+    UPDATE Expense
+    SET Amount = 0,
+        ExpenseDate = TRUNC(SYSDATE), -- The DATE value is stored in Oracle's default DATE format
+        Description = 'Reimbursement done' -- Set Description to 'Reimbursement done'
+    WHERE ExpenseID = p_ExpenseID AND StatusID = 2;
+
+    -- Raise an error if no rows were updated
+    IF SQL%ROWCOUNT = 0 THEN
+        RAISE_APPLICATION_ERROR(-20003, 'No matching ExpenseID with STATUSID = 2 found.');
+    END IF;
+END;
+/
 
 
 
-INSERT INTO Payment (PaymentID, EmployeeID, Amount, PaymentDate, PaymentMethod, ReimbursementID) VALUES 
-(1, 1, 150.00, TO_DATE('2024-01-20', 'YYYY-MM-DD'), 'Direct Deposit', 1),
-(2, 2, 2500.00, TO_DATE('2024-02-15', 'YYYY-MM-DD'), 'Check', 2),
-(3, 3, 500.00, TO_DATE('2024-02-20', 'YYYY-MM-DD'), 'Direct Deposit', 3),
-(4, 4, 75.00, TO_DATE('2024-03-10', 'YYYY-MM-DD'), 'Cash', 4),
-(5, 5, 300.00, TO_DATE('2024-03-25', 'YYYY-MM-DD'), 'Direct Deposit', 5),
-(6, 6, 1200.00, TO_DATE('2024-04-05', 'YYYY-MM-DD'), 'Check', 6),
-(7, 7, 90.00, TO_DATE('2024-04-15', 'YYYY-MM-DD'), 'Direct Deposit', 7),
-(8, 8, 600.00, TO_DATE('2024-04-25', 'YYYY-MM-DD'), 'Direct Deposit', 8),
-(9, 9, 2750.00, TO_DATE('2024-05-10', 'YYYY-MM-DD'), 'Check', 9),
-(10, 10, 200.00, TO_DATE('2024-05-20', 'YYYY-MM-DD'), 'Cash', 10);
 
+-----------------------------------------------Employee Policy------------------------------
+CREATE OR REPLACE FUNCTION Restricted_Expense_Policy (
+    schema_name IN VARCHAR2,
+    table_name IN VARCHAR2
+)
+RETURN VARCHAR2
+AS
+    employee_id VARCHAR2(100);
+BEGIN
+    -- Check the current session user
+    IF SYS_CONTEXT('USERENV', 'SESSION_USER') = 'DATAVIEWERUSER' THEN
+        -- Restrict DataViewerUser to a specific employee's data
+        employee_id := '1'; -- Replace with the specific employee_id for DataViewerUser
+        RETURN 'EMPLOYEEID = ''' || employee_id || '''';
+    ELSIF SYS_CONTEXT('USERENV', 'SESSION_USER') = 'TRAVELUSER' THEN
+        -- TravelUser has access to all rows
+        RETURN NULL;
+    ELSE
+        -- Deny access for all other users
+        RETURN '1=2';
+    END IF;
+END;
+/
+
+
+BEGIN
+    DBMS_RLS.ADD_POLICY(
+        object_schema   => 'TravelUser',
+        object_name     => 'Expense',
+        policy_name     => 'Restricted_Expense_Access',
+        function_schema => 'TravelUser', -- Schema where the function resides
+        policy_function => 'Restricted_Expense_Policy',
+        statement_types => 'SELECT, UPDATE'
+    );
+END;
+/
 
 
 
