@@ -23,6 +23,22 @@ This project involves setting up a database environment with specific user permi
 4. **Run `DevDB_TravelUser2.sql`**
    - This script inserts data into tables.
 
+5. **Run `Functions_and_Reports.sql`**
+   - This script create reports
+
+
+## Roles
+Admin role - System Admin
+App Admin role - TravelUser
+Employee role - DataViewerUser
+
+## Files for Presentation (Not to be run)
+DevDB_DataViewerUser.sql
+Functions of Triggers.sql
+TestCaseOfNewRecord.sql
+TestCases.sql
+Validations.sql
+
 ### Notes
 
 - Ensure that each script is run in the specified order to avoid permission issues.
