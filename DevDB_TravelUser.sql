@@ -156,7 +156,7 @@ CREATE TABLE Expense (
     EmployeeID NUMBER,  -- Foreign Key to Employee
     ExpenseTypeID NUMBER,  -- Foreign Key to ExpenseType
     AdminID NUMBER,  -- Link to Admin table for admin submitting/managing the expense
-    Amount NUMBER(7, 2) NOT NULL CHECK (Amount > 0 AND Amount <= 5000),  -- Positive amount <= 5000
+    Amount NUMBER(7, 2) NOT NULL CHECK (Amount >= 0 AND Amount <= 5000),  -- Positive amount <= 5000
     ExpenseDate DATE NOT NULL,  -- ExpenseDate should be on or before today
     Description VARCHAR2(255),
     StatusID NUMBER,  -- Foreign Key to ExpenseStatus
@@ -740,254 +740,146 @@ BEGIN
 END;
 /
 
-----------Packages,Procedures,Functions-------------
---1. NotificationManagement Package
---Specification
-CREATE OR REPLACE PACKAGE NotificationManagement IS
-    -- Functions
-    FUNCTION GetUnreadNotificationsCount(p_EmployeeID NUMBER) RETURN NUMBER;
-    FUNCTION GetNotificationDetails(p_NotificationID NUMBER) RETURN VARCHAR2;
 
-    -- Procedures
-    PROCEDURE CreateNotification(p_NotificationID NUMBER, p_EmployeeID NUMBER, p_AdminID NUMBER, p_Message VARCHAR2);
-    PROCEDURE MarkNotificationAsRead(p_NotificationID NUMBER);
-END NotificationManagement;
-/
-
----Body
-CREATE OR REPLACE PACKAGE BODY NotificationManagement IS
-    -- Function to get unread notifications count for an employee
-    FUNCTION GetUnreadNotificationsCount(p_EmployeeID NUMBER) RETURN NUMBER IS
-        v_Count NUMBER;
-    BEGIN
-        -- Query to count unread notifications for the given Employee ID
-        SELECT COUNT(*)
-        INTO v_Count
-        FROM Notifications
-        WHERE EmployeeID = p_EmployeeID AND IsRead = 'N';
-
-        RETURN v_Count;
-    EXCEPTION
-        WHEN NO_DATA_FOUND THEN
-            RETURN 0; -- Return 0 if no unread notifications are found
-    END;
-
-    -- Function to get notification details
-    FUNCTION GetNotificationDetails(p_NotificationID NUMBER) RETURN VARCHAR2 IS
-        v_Details VARCHAR2(255);
-    BEGIN
-        -- Query to fetch notification details for the given Notification ID
-        SELECT Message || ', Date: ' || TO_CHAR(NotificationDate, 'YYYY-MM-DD')
-        INTO v_Details
-        FROM Notifications
-        WHERE NotificationID = p_NotificationID;
-
-        RETURN v_Details;
-    EXCEPTION
-        WHEN NO_DATA_FOUND THEN
-            RETURN 'Notification Not Found'; -- Return default message if ID is not found
-    END;
-
-    -- Procedure to create a notification with manually provided NotificationID
-    PROCEDURE CreateNotification(
-        p_NotificationID NUMBER,
-        p_EmployeeID NUMBER,
-        p_AdminID NUMBER,
-        p_Message VARCHAR2
-    ) IS
-    BEGIN
-        -- Insert new notification into the Notifications table
-        INSERT INTO Notifications (
-            NotificationID,
-            EmployeeID,
-            AdminID,
-            Message,
-            NotificationDate,
-            IsRead
-        )
-        VALUES (
-            p_NotificationID,
-            p_EmployeeID,
-            p_AdminID,
-            p_Message,
-            SYSDATE,
-            'N'
-        );
-
-        -- Output success message
-        DBMS_OUTPUT.PUT_LINE('Notification Created Successfully with ID ' || p_NotificationID);
-    EXCEPTION
-        WHEN OTHERS THEN
-            DBMS_OUTPUT.PUT_LINE('Error: Unable to create notification. ' || SQLERRM);
-    END;
-
-    -- Procedure to mark a notification as read
-    PROCEDURE MarkNotificationAsRead(p_NotificationID NUMBER) IS
-    BEGIN
-        -- Update IsRead status to 'Y' for the given Notification ID
-        UPDATE Notifications
-        SET IsRead = 'Y'
-        WHERE NotificationID = p_NotificationID;
-
-        IF SQL%ROWCOUNT = 0 THEN
-            -- Output message if no rows were updated
-            DBMS_OUTPUT.PUT_LINE('Notification ID ' || p_NotificationID || ' not found.');
-        ELSE
-            -- Output success message
-            DBMS_OUTPUT.PUT_LINE('Notification Marked as Read for ID ' || p_NotificationID);
-        END IF;
-    EXCEPTION
-        WHEN OTHERS THEN
-            DBMS_OUTPUT.PUT_LINE('Error: Unable to mark notification as read. ' || SQLERRM);
-    END;
-
-END NotificationManagement;
-/
-
-
---------------usage---
---1.Create a Notification
-BEGIN
-    NotificationManagement.CreateNotification(
-        p_NotificationID => 201,  -- Manually assigned Notification ID
-        p_EmployeeID => 1,       -- Employee ID
-        p_AdminID => 2,          -- Admin ID
-        p_Message => 'Your expense has been approved and is ready for review.'
-    );
-    ROLLBACK;
-END;
-/
-
-
-----delete--
-DELETE FROM Notifications
-WHERE NotificationID = 201;
-
------2. Mark a Notification as Read
-
-BEGIN
-    NotificationManagement.MarkNotificationAsRead(p_NotificationID => 201);
-    ROLLBACK;
-END;
-/
-
-----3. Fetch Count of Unread Notifications
-
-SELECT NotificationManagement.GetUnreadNotificationsCount(1) AS UnreadCount FROM DUAL;
-
-
-
-----4. Get Notification Details
-
-SELECT NotificationManagement.GetNotificationDetails(201) AS NotificationDetails FROM DUAL;
-
----2. AuditLogManagement Package
+---------------- Stored procedures, functions, packages --------------------------------------
+--Packages
 --Package Specification
-CREATE OR REPLACE PACKAGE AuditLogManagement IS
-    -- Functions
-    FUNCTION GetAuditLogByExpense(p_ExpenseID NUMBER) RETURN SYS_REFCURSOR;
-    FUNCTION GetAuditCountByAdmin(p_AdminID NUMBER) RETURN NUMBER;
-
-    -- Procedures
-    PROCEDURE AddAuditLog(p_ExpenseID NUMBER, p_AdminID NUMBER, p_ActionTaken VARCHAR2);
-    PROCEDURE ClearAuditLogsOlderThan(p_Days NUMBER);
-END AuditLogManagement;
+--1. ExpenseManagementPkg
+CREATE OR REPLACE PACKAGE ExpenseManagementPkg AS
+    PROCEDURE ApproveExpense(p_ExpenseID IN NUMBER, p_AdminID IN NUMBER);
+    PROCEDURE CalculateTotalExpenses(p_EmployeeID IN NUMBER, o_TotalAmount OUT NUMBER);
+    FUNCTION GetEmployeeEmail(p_EmployeeID IN NUMBER) RETURN VARCHAR2;
+    FUNCTION IsExpenseFlagged(p_ExpenseID IN NUMBER) RETURN BOOLEAN;
+END ExpenseManagementPkg;
 /
 
----Body
-CREATE OR REPLACE PACKAGE BODY AuditLogManagement IS
-    -- Function to get audit logs for a specific expense
-    FUNCTION GetAuditLogByExpense(p_ExpenseID NUMBER) RETURN SYS_REFCURSOR IS
-        v_Cursor SYS_REFCURSOR;
+--Package Body
+
+CREATE OR REPLACE PACKAGE BODY ExpenseManagementPkg AS
+
+    -- Procedure to approve an expense
+    PROCEDURE ApproveExpense(p_ExpenseID IN NUMBER, p_AdminID IN NUMBER) IS
     BEGIN
-        OPEN v_Cursor FOR
-            SELECT AuditID, ExpenseID, AdminID, ActionTaken, ModificationDate
-            FROM AuditLog
-            WHERE ExpenseID = p_ExpenseID;
+        -- Update the Expense table
+        UPDATE Expense
+        SET StatusID = (SELECT StatusID FROM ExpenseStatus WHERE StatusName = 'Approved'),
+            AdminID = p_AdminID
+        WHERE ExpenseID = p_ExpenseID;
 
-        RETURN v_Cursor;
-    END;
+        -- Update the AuditLog table for the same ExpenseID
+        UPDATE AuditLog
+        SET ModifiedBy = 'Admin',
+            ModificationDate = SYSDATE,
+            ActionTaken = 'Expense Approved'
+        WHERE ExpenseID = p_ExpenseID;
 
-    -- Function to count audit logs created by a specific admin
-    FUNCTION GetAuditCountByAdmin(p_AdminID NUMBER) RETURN NUMBER IS
-        v_Count NUMBER;
+        -- Check if the update was successful
+        IF SQL%ROWCOUNT = 0 THEN
+            RAISE_APPLICATION_ERROR(-20001, 'No matching record found in AuditLog for ExpenseID: ' || p_ExpenseID);
+        END IF;
+    END ApproveExpense;
+
+    -- Procedure to calculate total expenses for an employee
+    PROCEDURE CalculateTotalExpenses(p_EmployeeID IN NUMBER, o_TotalAmount OUT NUMBER) IS
     BEGIN
-        SELECT COUNT(*)
-        INTO v_Count
-        FROM AuditLog
-        WHERE AdminID = p_AdminID;
+        SELECT SUM(Amount)
+        INTO o_TotalAmount
+        FROM Expense
+        WHERE EmployeeID = p_EmployeeID;
 
-        RETURN v_Count;
-    EXCEPTION
-        WHEN NO_DATA_FOUND THEN
-            RETURN 0;
-    END;
+        IF o_TotalAmount IS NULL THEN
+            o_TotalAmount := 0;
+        END IF;
+    END CalculateTotalExpenses;
 
-    -- Procedure to add an audit log
-    PROCEDURE AddAuditLog(p_ExpenseID NUMBER, p_AdminID NUMBER, p_ActionTaken VARCHAR2) IS
+    -- Function to get the email of an employee
+    FUNCTION GetEmployeeEmail(p_EmployeeID IN NUMBER) RETURN VARCHAR2 IS
+        v_Email VARCHAR2(100);
     BEGIN
-        INSERT INTO AuditLog (AuditID, ExpenseID, AdminID, ModifiedBy, ModificationDate, ActionTaken)
-        VALUES (AuditLog_SEQ.NEXTVAL, p_ExpenseID, p_AdminID, 'System', SYSDATE, p_ActionTaken);
+        SELECT Email
+        INTO v_Email
+        FROM Employee
+        WHERE EmployeeID = p_EmployeeID;
 
-        DBMS_OUTPUT.PUT_LINE('Audit Log Added for ExpenseID: ' || p_ExpenseID);
-    END;
+        RETURN v_Email;
+    END GetEmployeeEmail;
 
-    -- Procedure to clear audit logs older than a specified number of days
-    PROCEDURE ClearAuditLogsOlderThan(p_Days NUMBER) IS
+    -- Function to check if an expense is flagged
+    FUNCTION IsExpenseFlagged(p_ExpenseID IN NUMBER) RETURN BOOLEAN IS
+        v_Flagged NUMBER; -- Variable to hold the flagged status (as NUMBER)
     BEGIN
-        DELETE FROM AuditLog
-        WHERE ModificationDate < SYSDATE - p_Days;
+        -- Check if the expense is flagged
+        SELECT CASE WHEN Amount > 2500 THEN 1 ELSE 0 END
+        INTO v_Flagged
+        FROM Expense
+        WHERE ExpenseID = p_ExpenseID;
 
-        DBMS_OUTPUT.PUT_LINE('Audit Logs Older Than ' || p_Days || ' Days Deleted');
-    END;
+        -- Convert the NUMBER to BOOLEAN
+        RETURN v_Flagged = 1;
+    END IsExpenseFlagged;
 
-END AuditLogManagement;
+END ExpenseManagementPkg;
 /
 
----Usage
--- Fetch audit logs for a specific expense
--- Declare a variable to hold the result (REFCURSOR)
-VARIABLE v_cursor REFCURSOR;
-
--- Call the function to fetch audit logs for ExpenseID = 1
+-------- Update amount to zero when status is approved-----------------
+CREATE OR REPLACE PROCEDURE sp_update_expense_details (
+    p_ExpenseID IN NUMBER
+)
+AS
 BEGIN
-    :v_cursor := AuditLogManagement.GetAuditLogByExpense(1);
-    ROLLBACK;
+    -- Update the Amount, ExpenseDate, and Description
+    UPDATE Expense
+    SET Amount = 0,
+        ExpenseDate = TRUNC(SYSDATE), -- The DATE value is stored in Oracle's default DATE format
+        Description = 'Reimbursement done' -- Set Description to 'Reimbursement done'
+    WHERE ExpenseID = p_ExpenseID AND StatusID = 2;
+
+    -- Raise an error if no rows were updated
+    IF SQL%ROWCOUNT = 0 THEN
+        RAISE_APPLICATION_ERROR(-20003, 'No matching ExpenseID with STATUSID = 2 found.');
+    END IF;
 END;
 /
 
--- Print the contents of the REFCURSOR
-PRINT v_cursor;
 
 
--- Count audit logs created by an admin
-SELECT AuditLogManagement.GetAuditCountByAdmin(1) AS AdminAuditCount FROM DUAL;
 
--- Add a new audit log
+-----------------------------------------------Employee Policy------------------------------
+CREATE OR REPLACE FUNCTION Restricted_Expense_Policy (
+    schema_name IN VARCHAR2,
+    table_name IN VARCHAR2
+)
+RETURN VARCHAR2
+AS
+    employee_id VARCHAR2(100);
 BEGIN
-    AuditLogManagement.AddAuditLog(
-        p_ExpenseID => 1,    -- The Expense ID for which the log is being created
-        p_AdminID => 2,      -- Admin ID creating the log
-        p_ActionTaken => 'Expense Approved' -- Description of the action taken
+    -- Check the current session user
+    IF SYS_CONTEXT('USERENV', 'SESSION_USER') = 'DATAVIEWERUSER' THEN
+        -- Restrict DataViewerUser to a specific employee's data
+        employee_id := '1'; -- Replace with the specific employee_id for DataViewerUser
+        RETURN 'EMPLOYEEID = ''' || employee_id || '''';
+    ELSIF SYS_CONTEXT('USERENV', 'SESSION_USER') = 'TRAVELUSER' THEN
+        -- TravelUser has access to all rows
+        RETURN NULL;
+    ELSE
+        -- Deny access for all other users
+        RETURN '1=2';
+    END IF;
+END;
+/
+
+
+BEGIN
+    DBMS_RLS.ADD_POLICY(
+        object_schema   => 'TravelUser',
+        object_name     => 'Expense',
+        policy_name     => 'Restricted_Expense_Access',
+        function_schema => 'TravelUser', -- Schema where the function resides
+        policy_function => 'Restricted_Expense_Policy',
+        statement_types => 'SELECT, UPDATE'
     );
-    ROLLBACK;
 END;
 /
 
-SELECT * FROM AuditLog;
 
-DELETE FROM AuditLog
-WHERE ExpenseID = 1
-  AND AdminID = 2
-  AND ActionTaken = 'Expense Approved';
-
--- Commit the transaction to save the changes
-COMMIT;
-
-
--- Clear audit logs older than 30 days
-BEGIN
-    AuditLogManagement.ClearAuditLogsOlderThan(30);
-    ROLLBACK;
-END;
 

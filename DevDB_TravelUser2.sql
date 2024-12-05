@@ -69,18 +69,37 @@ INSERT INTO Administrator (AdminID, AdminName, Role, Email) VALUES
 (9, 'Admin9', 'Deleter', 'admin9@example.com'),
 (10, 'Admin10', 'Admin', 'admin10@example.com');
 
-INSERT INTO Expense (ExpenseID, EmployeeID, ExpenseTypeID, AdminID, Amount, ExpenseDate, Description, StatusID) VALUES 
-(1, 1, 1, 1, 150.00, TO_DATE('2024-01-15', 'YYYY-MM-DD'), 'Lunch meeting with client', 1),
-(2, 2, 2, 2, 2500.00, TO_DATE('2024-02-10', 'YYYY-MM-DD'), 'Flight for conference', 2),
-(3, 3, 3, 1, 500.00, TO_DATE('2024-02-15', 'YYYY-MM-DD'), 'Hotel stay for training', 3),
-(4, 4, 1, 2, 75.00, TO_DATE('2024-03-05', 'YYYY-MM-DD'), 'Team dinner', 1),
-(5, 5, 2, 1, 300.00, TO_DATE('2024-03-20', 'YYYY-MM-DD'), 'Tickets for client event', 2),
-(6, 6, 2, 1, 1200.00, TO_DATE('2024-04-02', 'YYYY-MM-DD'), 'Travel for on-site meeting', 3),
-(7, 7, 1, 2, 90.00, TO_DATE('2024-04-12', 'YYYY-MM-DD'), 'Working lunch with partner', 1),
-(8, 8, 3, 1, 600.00, TO_DATE('2024-04-22', 'YYYY-MM-DD'), 'Accommodation for training', 2),
-(9, 9, 2, 2, 2750.00, TO_DATE('2024-05-05', 'YYYY-MM-DD'), 'International flight',3),
-(10, 10, 1, 1, 200.00, TO_DATE('2024-05-15', 'YYYY-MM-DD'), 'Client entertainment', 1);
-
+COMMIT;
+INSERT INTO Expense (ExpenseID, EmployeeID, ExpenseTypeID, AdminID, Amount, ExpenseDate, Description, StatusID) 
+VALUES (1, 1, 1, 1, 150.00, TO_DATE('2024-01-15', 'YYYY-MM-DD'), 'Lunch meeting with client', 1);
+COMMIT;
+INSERT INTO Expense (ExpenseID, EmployeeID, ExpenseTypeID, AdminID, Amount, ExpenseDate, Description, StatusID) 
+VALUES (2, 2, 2, 2, 2500.00, TO_DATE('2024-02-10', 'YYYY-MM-DD'), 'Flight for conference', 2);
+COMMIT;
+INSERT INTO Expense (ExpenseID, EmployeeID, ExpenseTypeID, AdminID, Amount, ExpenseDate, Description, StatusID) 
+VALUES (3, 3, 3, 1, 500.00, TO_DATE('2024-02-15', 'YYYY-MM-DD'), 'Hotel stay for training', 3);
+COMMIT;
+INSERT INTO Expense (ExpenseID, EmployeeID, ExpenseTypeID, AdminID, Amount, ExpenseDate, Description, StatusID) 
+VALUES (4, 4, 1, 2, 75.00, TO_DATE('2024-03-05', 'YYYY-MM-DD'), 'Team dinner', 1);
+COMMIT;
+INSERT INTO Expense (ExpenseID, EmployeeID, ExpenseTypeID, AdminID, Amount, ExpenseDate, Description, StatusID) 
+VALUES (5, 5, 2, 1, 300.00, TO_DATE('2024-03-20', 'YYYY-MM-DD'), 'Tickets for client event', 2);
+COMMIT;
+INSERT INTO Expense (ExpenseID, EmployeeID, ExpenseTypeID, AdminID, Amount, ExpenseDate, Description, StatusID) 
+VALUES (6, 6, 2, 1, 1200.00, TO_DATE('2024-04-02', 'YYYY-MM-DD'), 'Travel for on-site meeting', 3);
+COMMIT;
+INSERT INTO Expense (ExpenseID, EmployeeID, ExpenseTypeID, AdminID, Amount, ExpenseDate, Description, StatusID) 
+VALUES (7, 7, 1, 2, 90.00, TO_DATE('2024-04-12', 'YYYY-MM-DD'), 'Working lunch with partner', 1);
+COMMIT;
+INSERT INTO Expense (ExpenseID, EmployeeID, ExpenseTypeID, AdminID, Amount, ExpenseDate, Description, StatusID) 
+VALUES (8, 8, 3, 1, 600.00, TO_DATE('2024-04-22', 'YYYY-MM-DD'), 'Accommodation for training', 2);
+COMMIT;
+INSERT INTO Expense (ExpenseID, EmployeeID, ExpenseTypeID, AdminID, Amount, ExpenseDate, Description, StatusID) 
+VALUES (9, 9, 2, 2, 2750.00, TO_DATE('2024-05-05', 'YYYY-MM-DD'), 'International flight', 3);
+COMMIT;
+INSERT INTO Expense (ExpenseID, EmployeeID, ExpenseTypeID, AdminID, Amount, ExpenseDate, Description, StatusID) 
+VALUES (10, 10, 1, 1, 200.00, TO_DATE('2024-05-15', 'YYYY-MM-DD'), 'Client entertainment', 1);
+COMMIT;
 
 
 INSERT INTO Approval (ApprovalID, ExpenseID, AuditorID, AdminID, StatusID, ApprovalDate, Comments) VALUES 
@@ -109,10 +128,6 @@ INSERT INTO AuditLog (AuditID, AuditorID, ExpenseID, AdminID, ModifiedBy, Modifi
     (8, 8, 8, 8, 'Admin8', TO_DATE('2024-01-08', 'YYYY-MM-DD'), 'Cancelled Expense'),
     (9, 9, 9, 9, 'Admin9', TO_DATE('2024-01-09', 'YYYY-MM-DD'), 'Under Review'),
     (10, 10, 10, 10, 'Admin10', TO_DATE('2024-01-10', 'YYYY-MM-DD'), 'Deferred Expense'); 
-
-
-    
-
 
 
 -- Insert sample data into Notifications table
@@ -159,5 +174,5 @@ INSERT INTO Payment (PaymentID, EmployeeID, Amount, PaymentDate, PaymentMethod, 
 (10, 10, 200.00, TO_DATE('2024-05-20', 'YYYY-MM-DD'), 'Cash', 10);
 
 
-SELECT * FROM Expense;
+
 
