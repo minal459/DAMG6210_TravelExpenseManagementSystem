@@ -156,7 +156,7 @@ CREATE TABLE Expense (
     EmployeeID NUMBER,  -- Foreign Key to Employee
     ExpenseTypeID NUMBER,  -- Foreign Key to ExpenseType
     AdminID NUMBER,  -- Link to Admin table for admin submitting/managing the expense
-    Amount NUMBER(7, 2) NOT NULL CHECK (Amount > 0 AND Amount <= 5000),  -- Positive amount <= 5000
+    Amount NUMBER(7, 2) NOT NULL CHECK (Amount >= 0 AND Amount <= 5000),  -- Positive amount <= 5000
     ExpenseDate DATE NOT NULL,  -- ExpenseDate should be on or before today
     Description VARCHAR2(255),
     StatusID NUMBER,  -- Foreign Key to ExpenseStatus
@@ -821,171 +821,28 @@ CREATE OR REPLACE PACKAGE BODY ExpenseManagementPkg AS
 END ExpenseManagementPkg;
 /
 
---2. NotificationManagement Package
---Specification
-CREATE OR REPLACE PACKAGE NotificationManagement IS
-    -- Functions
-    FUNCTION GetUnreadNotificationsCount(p_EmployeeID NUMBER) RETURN NUMBER;
-    FUNCTION GetNotificationDetails(p_NotificationID NUMBER) RETURN VARCHAR2;
+-------- Update amount to zero when status is approved-----------------
+CREATE OR REPLACE PROCEDURE sp_update_expense_details (
+    p_ExpenseID IN NUMBER
+)
+AS
+BEGIN
+    -- Update the Amount, ExpenseDate, and Description
+    UPDATE Expense
+    SET Amount = 0,
+        ExpenseDate = TRUNC(SYSDATE), -- The DATE value is stored in Oracle's default DATE format
+        Description = 'Reimbursement done' -- Set Description to 'Reimbursement done'
+    WHERE ExpenseID = p_ExpenseID AND StatusID = 2;
 
-    -- Procedures
-    PROCEDURE CreateNotification(p_NotificationID NUMBER, p_EmployeeID NUMBER, p_AdminID NUMBER, p_Message VARCHAR2);
-    PROCEDURE MarkNotificationAsRead(p_NotificationID NUMBER);
-END NotificationManagement;
+    -- Raise an error if no rows were updated
+    IF SQL%ROWCOUNT = 0 THEN
+        RAISE_APPLICATION_ERROR(-20003, 'No matching ExpenseID with STATUSID = 2 found.');
+    END IF;
+END;
 /
 
----Body
-CREATE OR REPLACE PACKAGE BODY NotificationManagement IS
-    -- Function to get unread notifications count for an employee
-    FUNCTION GetUnreadNotificationsCount(p_EmployeeID NUMBER) RETURN NUMBER IS
-        v_Count NUMBER;
-    BEGIN
-        -- Query to count unread notifications for the given Employee ID
-        SELECT COUNT(*)
-        INTO v_Count
-        FROM Notifications
-        WHERE EmployeeID = p_EmployeeID AND IsRead = 'N';
 
-        RETURN v_Count;
-    EXCEPTION
-        WHEN NO_DATA_FOUND THEN
-            RETURN 0; -- Return 0 if no unread notifications are found
-    END;
 
-    -- Function to get notification details
-    FUNCTION GetNotificationDetails(p_NotificationID NUMBER) RETURN VARCHAR2 IS
-        v_Details VARCHAR2(255);
-    BEGIN
-        -- Query to fetch notification details for the given Notification ID
-        SELECT Message || ', Date: ' || TO_CHAR(NotificationDate, 'YYYY-MM-DD')
-        INTO v_Details
-        FROM Notifications
-        WHERE NotificationID = p_NotificationID;
-
-        RETURN v_Details;
-    EXCEPTION
-        WHEN NO_DATA_FOUND THEN
-            RETURN 'Notification Not Found'; -- Return default message if ID is not found
-    END;
-
-    -- Procedure to create a notification with manually provided NotificationID
-    PROCEDURE CreateNotification(
-        p_NotificationID NUMBER,
-        p_EmployeeID NUMBER,
-        p_AdminID NUMBER,
-        p_Message VARCHAR2
-    ) IS
-    BEGIN
-        -- Insert new notification into the Notifications table
-        INSERT INTO Notifications (
-            NotificationID,
-            EmployeeID,
-            AdminID,
-            Message,
-            NotificationDate,
-            IsRead
-        )
-        VALUES (
-            p_NotificationID,
-            p_EmployeeID,
-            p_AdminID,
-            p_Message,
-            SYSDATE,
-            'N'
-        );
-
-        -- Output success message
-        DBMS_OUTPUT.PUT_LINE('Notification Created Successfully with ID ' || p_NotificationID);
-    EXCEPTION
-        WHEN OTHERS THEN
-            DBMS_OUTPUT.PUT_LINE('Error: Unable to create notification. ' || SQLERRM);
-    END;
-
-    -- Procedure to mark a notification as read
-    PROCEDURE MarkNotificationAsRead(p_NotificationID NUMBER) IS
-    BEGIN
-        -- Update IsRead status to 'Y' for the given Notification ID
-        UPDATE Notifications
-        SET IsRead = 'Y'
-        WHERE NotificationID = p_NotificationID;
-
-        IF SQL%ROWCOUNT = 0 THEN
-            -- Output message if no rows were updated
-            DBMS_OUTPUT.PUT_LINE('Notification ID ' || p_NotificationID || ' not found.');
-        ELSE
-            -- Output success message
-            DBMS_OUTPUT.PUT_LINE('Notification Marked as Read for ID ' || p_NotificationID);
-        END IF;
-    EXCEPTION
-        WHEN OTHERS THEN
-            DBMS_OUTPUT.PUT_LINE('Error: Unable to mark notification as read. ' || SQLERRM);
-    END;
-
-END NotificationManagement;
-/
-
----3. AuditLogManagement Package
---Package Specification
-CREATE OR REPLACE PACKAGE AuditLogManagement IS
-    -- Functions
-    FUNCTION GetAuditLogByExpense(p_ExpenseID NUMBER) RETURN SYS_REFCURSOR;
-    FUNCTION GetAuditCountByAdmin(p_AdminID NUMBER) RETURN NUMBER;
-
-    -- Procedures
-    PROCEDURE AddAuditLog(p_ExpenseID NUMBER, p_AdminID NUMBER, p_ActionTaken VARCHAR2);
-    PROCEDURE ClearAuditLogsOlderThan(p_Days NUMBER);
-END AuditLogManagement;
-/
-
----Body
-CREATE OR REPLACE PACKAGE BODY AuditLogManagement IS
-    -- Function to get audit logs for a specific expense
-    FUNCTION GetAuditLogByExpense(p_ExpenseID NUMBER) RETURN SYS_REFCURSOR IS
-        v_Cursor SYS_REFCURSOR;
-    BEGIN
-        OPEN v_Cursor FOR
-            SELECT AuditID, ExpenseID, AdminID, ActionTaken, ModificationDate
-            FROM AuditLog
-            WHERE ExpenseID = p_ExpenseID;
-
-        RETURN v_Cursor;
-    END;
-
-    -- Function to count audit logs created by a specific admin
-    FUNCTION GetAuditCountByAdmin(p_AdminID NUMBER) RETURN NUMBER IS
-        v_Count NUMBER;
-    BEGIN
-        SELECT COUNT(*)
-        INTO v_Count
-        FROM AuditLog
-        WHERE AdminID = p_AdminID;
-
-        RETURN v_Count;
-    EXCEPTION
-        WHEN NO_DATA_FOUND THEN
-            RETURN 0;
-    END;
-
-    -- Procedure to add an audit log
-    PROCEDURE AddAuditLog(p_ExpenseID NUMBER, p_AdminID NUMBER, p_ActionTaken VARCHAR2) IS
-    BEGIN
-        INSERT INTO AuditLog (AuditID, ExpenseID, AdminID, ModifiedBy, ModificationDate, ActionTaken)
-        VALUES (AuditLog_SEQ.NEXTVAL, p_ExpenseID, p_AdminID, 'System', SYSDATE, p_ActionTaken);
-
-        DBMS_OUTPUT.PUT_LINE('Audit Log Added for ExpenseID: ' || p_ExpenseID);
-    END;
-
-    -- Procedure to clear audit logs older than a specified number of days
-    PROCEDURE ClearAuditLogsOlderThan(p_Days NUMBER) IS
-    BEGIN
-        DELETE FROM AuditLog
-        WHERE ModificationDate < SYSDATE - p_Days;
-
-        DBMS_OUTPUT.PUT_LINE('Audit Logs Older Than ' || p_Days || ' Days Deleted');
-    END;
-
-END AuditLogManagement;
-/
 
 -----------------------------------------------Employee Policy------------------------------
 CREATE OR REPLACE FUNCTION Restricted_Expense_Policy (
